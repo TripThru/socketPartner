@@ -53,8 +53,6 @@ function createDispatchRequest(trip, partner) {
       pickupTime: getISOStringFromMoment(trip.pickupTime),
       dropoffLocation: apiLocation(trip.dropoffLocation)
   };
-  if(trip.fleet) r.fleet = idName(trip.fleet);
-  if(trip.driver) r.driver = idName(trip.driver);
   if(trip.vehicleType) r.vehicleType = trip.vehicleType;
   if(partner) r.partner = idName(partner);
   return r;
@@ -64,10 +62,13 @@ function createUpdateTripStatusRequest(trip) {
   var r = {
       id: trip.publicId,
       clientId: trip.partner.id,
-      status: trip.status,
-      eta: getISOStringFromMoment(trip.eta)
+      status: trip.status
   };
-  if(trip.driver.location) r.driverLocation = apiLocation(trip.driver.location);
+  if(trip.eta) r.eta = getISOStringFromMoment(trip.eta);
+  if(trip.driver) {
+    r.driver = idName(trip.driver);
+    if(trip.driver.location) r.driver.location = apiLocation(trip.driver.location);
+  }
   return r;
 }
 
@@ -97,10 +98,15 @@ function createTripFromDispatchRequest(request) {
 function createTripFromUpdateTripStatusRequest(request) {
   var trip = {
     publicId: request.id,
-    status: request.status,
-    driver: { location: request.driverLocation },
-    eta: getMomentFromISOString(request.eta)
+    status: request.status
   };
+  if(request.driver) {
+    trip.driver = idName(request.driver);
+    if(request.driver.location) {
+      trip.driver.location = request.driver.location;
+    }
+  }
+  if(request.eta) trip.eta = getMomentFromISOString(request.eta)
   return trip;
 }
 
@@ -119,27 +125,32 @@ function createUpdateTripStatusResponse(trip) {
   return successResponse();
 }
 
-function createGetTripStatusResponse(trip) {
+function createGetTripStatusResponse(trip, partner) {
   var r = successResponse();
-  r.partner = idName(trip.partner);
   r.fleet = idName(trip.fleet);
   r.passenger = idName(trip.passenger);
-  r.pickupTime = getISOStringFromMoment(trip.pickupTime);
   r.pickupLocation = apiLocation(trip.pickupLocation);
-  r.dropoffTime = getISOStringFromMoment(trip.dropoffTime);
   r.dropoffLocation = apiLocation(trip.dropoffLocation);
   r.vehicleType = trip.vehicleType;
   r.status = trip.status;
-  r.eta = getISOStringFromMoment(trip.eta);
-  if(trip.origination === 'local') r.originatingPartner = trip.partner.id;
-  if(trip.origination === 'foreign') r.servicingPartner = trip.partner.id;
+  if(trip.dropoffTime) r.dropoffTime = getISOStringFromMoment(trip.dropoffTime);
+  if(trip.pickupTime) r.pickupTime = getISOStringFromMoment(trip.pickupTime);
+  if(trip.eta) r.eta = getISOStringFromMoment(trip.eta);
+  if(trip.origination === 'local') {
+    r.originatingPartner = idName({id: partner.id, name: partner.name});
+    r.servicingPartner = idName({id: trip.partner.id, name: trip.partner.name});
+  } else {
+    r.originatingPartner = idName({id: trip.partner.id, name: trip.partner.name});
+    r.servicingPartner = idName({id: partner.id, name: partner.name});
+  }
+  if(trip.origination === 'foreign') r.servicingPartner = idName({id: trip.partner.id});
   if(trip.price) r.price = trip.price;
   if(trip.driver) {
     r.driver = idName(trip.driver);
-    r.driver.location = trip.driver.location;
-    r.driver.initialLocation = trip.driver.initialLocation;
+    if(trip.driver.location) r.driver.location = apiLocation(trip.driver.location);
+    if(trip.driver.initialLocation) r.driver.initialLocation = apiLocation(trip.driver.initialLocation);
     if(trip.driver.route) {
-      r.distance = trip.route.distance;
+      r.distance = trip.driver.route.distance;
       r.driver.routeDuration = trip.driver.route.duration.asSeconds();
     }
   }
@@ -148,22 +159,18 @@ function createGetTripStatusResponse(trip) {
 
 function createGetPartnerInfoResponse(fleets) {
   var response = {
+      coverage: [],
       fleets: [],
       vehicleTypes: []
   };
   var vehicleTypesTemp = {};
   for(var i = 0; i < fleets.length; i++) {
     var fleet = fleets[i];
-    var f = {};
-    var coverage = {
+    response.fleets.push(idName(fleet));
+    response.coverage.push({
         center: apiLocation(fleet.coverage.center),
         radius: fleet.coverage.radius
-    };
-    
-    f.partner = idName(fleet.partner);
-    f.fleet = idName(fleet);
-    f.coverage = coverage;
-    response.fleets.push(f);
+    });
     for(var j = 0; j < fleet.vehicleTypes.length; j++) {
       var type = fleet.vehicleTypes[j];
       if(!vehicleTypesTemp.hasOwnProperty(type)) {
@@ -192,7 +199,7 @@ function createRequestFromTrip(trip, type, args) {
   }
 }
 
-function createResponseFromTrip(trip, type, message, errorCode) {
+function createResponseFromTrip(trip, type, message, errorCode, args) {
   if(errorCode) {
     return failResponse(message, errorCode);
   }
@@ -202,7 +209,13 @@ function createResponseFromTrip(trip, type, message, errorCode) {
     case 'update-trip-status':
       return createUpdateTripStatusResponse(trip);
     case 'get-trip-status':
-      return createGetTripStatusResponse(trip);
+      var partner;
+      if(args && args.partner && args.partner.id && args.partner.name) {
+        partner = args.partner;
+      } else {
+        throw new Error('Partner arg is required');
+      }
+      return createGetTripStatusResponse(trip, partner);
     default:
       throw new Error('Invalid request type ' + type);
   }
@@ -211,11 +224,11 @@ function createResponseFromTrip(trip, type, message, errorCode) {
 function createTripFromRequest(trip, type) {
   switch(type) {
     case 'dispatch':
-      return createDispatchResponse(trip);
+      return createTripFromDispatchRequest(trip);
     case 'update-trip-status':
-      return createUpdateTripStatusResponse(trip);
+      return createTripFromUpdateTripStatusRequest(trip);
     case 'get-trip-status':
-      return createGetTripStatusResponse(trip);
+      return createTripFromGetTripStatusRequest(trip);
     default:
       throw new Error('Invalid request type ' + type);
   }
@@ -259,8 +272,8 @@ function createQuoteFromTrip(trip) {
         return trip.fleet
           .getPriceAndDistance(trip)
           .then(function(priceAndDistance){
-            quote.price = trip.fleet.getPrice(trip);
-            quote.distance = trip.fleet.getDistance(trip);
+            quote.price = priceAndDistance.price;
+            quote.distance = priceAndDistance.distance;
           });
       }
     })
@@ -277,7 +290,7 @@ function createUpdateQuoteRequestFromQuoteRequest(request, fleets) {
     if(!fleet.servesLocation(request.pickupLocation)) {
       continue;
     }
-    for(var j = 0; j < fleet.vehicleTypes; j++) {
+    for(var j = 0; j < fleet.vehicleTypes.length; j++) {
       var vehicleType = fleet.vehicleTypes[j];
       if(request.vehicleType === vehicleType) {
         var trip = createTripFromQuoteRequest(request, fleet);

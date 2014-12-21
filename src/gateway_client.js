@@ -5,10 +5,11 @@ var IGateway = require('./gateway').IGateway;
 var Interface = require('./interface').Interface;
 var logger = require('./logger');
 
-function GatewayClient(id, name) {
+function GatewayClient(id, name, clientId) {
   Gateway.call(this, id, name);
   this.socket = null;
   this.listener = null;
+  this.clientId = clientId;
 }
 
 GatewayClient.prototype.setListener = function(listener) {
@@ -18,36 +19,37 @@ GatewayClient.prototype.setListener = function(listener) {
   //Trips
   this.socket.on('dispatch-trip', function(req, cb){
     this.listener.dispatchTrip(req, cb);
-  });
+  }.bind(this));
   this.socket.on('get-trip', function(req, cb){
     this.listener.getTrip(req, cb);
-  });
+  }.bind(this));
   this.socket.on('get-trip-status', function(req, cb){
     this.listener.getTripStatus(req, cb);
-  });
+  }.bind(this));
   this.socket.on('update-trip-status', function(req, cb){
     this.listener.updateTripStatus(req, cb);
-  });
+  }.bind(this));
   
   //Quotes
-  this.socket.on('create-quote', function(req, cb){
-    this.listener.createQuote(req, cb);
-  });
+  this.socket.on('quote-trip', function(req, cb){
+    this.listener.quoteTrip(req, cb);
+  }.bind(this));
   this.socket.on('get-quote', function(req, cb){
     this.listener.getQuote(req, cb);
-  });
+  }.bind(this));
   this.socket.on('update-quote', function(req, cb){
     this.listener.updateQuote(req, cb);
-  });
+  }.bind(this));
   
   //Users
   this.socket.on('get-partner-info', function(req ,cb){
     this.listener.getPartnerInfo(req, cb);
-  });
+  }.bind(this));
 };
 
 GatewayClient.prototype.open = function(url, token, cb) {
   this.socket = io.connect(url, {
+    forceNew: true,
     query: querystring.stringify({token:token}),
     transports: ['websocket']
   });
@@ -73,9 +75,10 @@ GatewayClient.prototype.open = function(url, token, cb) {
 
 GatewayClient.prototype.emit = function(action, request) {
   var self = this;
+  request.clientId = this.clientId;
   return new Promise(function(resolve, reject){
     self.socket.emit(action, request, function(res){
-      logger.log('socket', 'Emitted ' + action + ' ' + request.id + ', res: ' + res.result);
+      logger.log(self.listener.id, 'Emitted ' + action + ' ' + request.id + ', res: ' + res.result);
       resolve(res);
     });
   });
@@ -83,6 +86,10 @@ GatewayClient.prototype.emit = function(action, request) {
 
 GatewayClient.prototype.getPartnerInfo = function(request) {
   return this.emit('get-partner-info', request);
+};
+
+GatewayClient.prototype.setPartnerInfo = function(request) { 
+  return this.emit('set-partner-info', request);
 };
 
 GatewayClient.prototype.dispatchTrip = function(request) {

@@ -30,11 +30,11 @@ RouteModel.prototype.updateRoute = function(route) {
   return store.updateRoute(route);
 };
 
-RouteModel.prototype.getRoute = function(route) {
+RouteModel.prototype.getRouteById = function(routeId) {
   return store
-    .getRoute(route)
+    .getRoute({id: routeId})
     .then(function(result){
-      return result.length > 0 ? result[0] : null;
+      return result.length > 0 ? result[0].toObject() : null;
     });
 };
 

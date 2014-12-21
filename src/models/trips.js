@@ -57,7 +57,7 @@ TripModel.prototype.getTrip = function(trip) {
   return store
     .getTrip(trip)
     .then(function(result){
-      return result.length > 0 ? datesToMoments(result[0]) : null;
+      return result.length > 0 ? datesToMoments(result[0].toObject()) : null;
     });
 };
 

@@ -1,29 +1,71 @@
+var partnerConfigName = process.argv[2];
+if(!partnerConfigName) {
+  throw new Error('Please specify a partner configuration name');
+}
 var logger = require('./src/logger');
-var config = require('./config');
+var fs = require('fs');
 var GatewayClient = require('./src/gateway_client');
-var PartnerFactory = require('./src/Partner').PartnerFactory;
+var PartnerFactory = require('./src/partner').PartnerFactory;
+var configDirectory = './partner_config/';
 
-logger.log('init', 'Loading configurations...');
-var simulationInterval = config.simulationInterval*1000;
-var client = new GatewayClient('client', 'client');
-logger.log('init', 'Creating partner from configuration...');
-var partner = PartnerFactory.createPartner(client, config);
-
-logger.log('init', 'Opening socket client...');
-var firstTimeConnecting = true;
-client.open(config.tripthru.url, config.tripthru.token, function() {
-  logger.log('init', 'Socket open, starting simulation...');
-  client.setListener(partner);
-  if(firstTimeConnecting){
-    firstTimeConnecting = false;
-    start();
-  }
-});
-
-var start = function() {
+function start(partner, interval) {
   partner
     .update()
     .then(function(){
-      setTimeout(start, simulationInterval);
+      setTimeout(function(){
+        start(partner, interval);
+      }, interval);
+    })
+    .error(function(err){
+      logger.log('sim', 'Partner ' + partner.id + ' crashed: ' + err);
     });
-};
+}
+
+var started = {};
+
+function runOnePartner(name) {
+  var config = require(configDirectory + name);
+  logger.log('init', 'Loading configuration ' + name);
+  var simulationInterval = config.simulationInterval*1000;
+  var client = new GatewayClient('client' + config.name, 'client' + config.name, 
+      config.clientId);
+  logger.log('init', 'Creating partner ' + name + 'from configuration...');
+  var partner = PartnerFactory.createPartner(client, config);
+
+  logger.log('init', 'Opening socket client ' + name + '...');
+  client.open(config.tripthru.url, config.tripthru.token, function() {
+    logger.log('init', 'Socket open, starting simulation ' + name + '...');
+    client.setListener(partner);
+    if(!started.hasOwnProperty(name)){
+      started[name] = true;
+      partner.setPartnerInfoAtTripThru(function(){
+        setTimeout(function(){
+          start(partner, simulationInterval);
+        }, 5000);
+      });
+    }
+  });
+}
+
+function endsWith(str, suffix) {
+  return str.indexOf(suffix, str.length - suffix.length) !== -1;
+}
+
+function runAllPartners() {
+  var files = fs.readdirSync(configDirectory);
+  for(var i = 0; i < files.length; i++) {
+    if(endsWith(files[i].toString(), '.js')) {
+      runOnePartner(files[i]);
+    }
+  }
+}
+
+var configName = process.argv[2];
+if(!configName) {
+  throw new Error('Please specify a configuration name or \'all\' to run all');
+}
+if(configName === 'all') {
+  runAllPartners();
+} else {
+  runOnePartner(configName);
+}

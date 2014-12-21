@@ -129,7 +129,7 @@ MapTools.prototype.getRoute = function(from, to) {
   var self = this;
   
   return store
-    .getRoute(Route.getKey(from, to))
+    .getRouteById(Route.getKey(from, to))
     .then(function(route){
       if(route) {
         return Promise.resolve(routeFromStoreResult(route));

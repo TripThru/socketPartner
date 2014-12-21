@@ -1,13 +1,10 @@
 var logger = require('./logger');
-var maptools = require('./map_tools');
+var maptools = require('./map_tools').MapTools;
 
 function Trip(config) {
   
   if(!config.id) {
     throw new Error('Id is required');
-  }
-  if(!config.idNumber) {
-    throw new Error('Id number is required');
   }
   if(!config.fleet) {
     throw new Error('Fleet is required');
@@ -61,9 +58,23 @@ function Trip(config) {
 }
 
 Trip.prototype.statusHasChanged = function(status, driverLocation, eta) {
-  return this.status !== status || 
-    maptools.locationsAreEqual(driverLocation, this.driver.location) ||
-    !this.eta.isSame(eta);
+  var statusChanged = false;
+  if(this.status !== status) {
+    statusChanged = true;
+  } else if(driverLocation) {
+    if(!this.driver || !this.driver.location) {
+      statusChanged = true;
+    } else if(maptools.locationsAreEqual(driverLocation, this.driver.location)) {
+      statusChanged = true;
+    }
+  } else if(eta){
+    if(!this.eta) {
+      statusChanged = true;
+    } else if(!this.eta.isSame(eta)) {
+      statusChanged = true;
+    }
+  }
+  return statusChanged;
 };
 
 Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, eta) {
@@ -77,6 +88,9 @@ Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, et
 
     this.eta = eta || this.eta;
     this.status = status;
+    if(driverLocation) {
+      this.updateDriverLocation(driverLocation);
+    }
     switch(status) {
       case 'complete':
         logger.log(this.id, 'Trip completed, deactivating');
@@ -84,9 +98,10 @@ Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, et
         break;
       case 'rejected':
       case 'cancelled':
-        if(this.origination === 'foreign' && this.fleet.missedPeriodReached(this)) {
+        if(this.origination === 'foreign' ||  this.fleet.missedPeriodReached(this)) {
           logger.log(this.id, 'Missed period reached or trip is foreign so deactivating');
           this.partner.deactivateTrip(this, status);
+          notifyPartner = true;
         } else {
           logger.log(this.id, 'Missed period not reached yet so putting trip back to queue');
           this.status = 'queued';
@@ -107,6 +122,7 @@ Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, et
 };
 
 Trip.prototype.updateDriverLocation = function(location) {
+  if(!this.driver) this.driver = {};
   this.driver.location = location;
   if(!this.driver.initalLocation) {
     this.driver.initialLocation = location;

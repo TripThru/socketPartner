@@ -33,7 +33,7 @@ function Fleet(config) {
   if(!config.vehicleTypes || config.vehicleTypes.length === 0) {
     throw new Error('Vehicle types are required');
   }
-  if(!config.possibleTrips || config.possibleTrips.length === 0) {
+  if(!config.possibleTrips) {
     throw new Error('Possible trips are required');
   }
   if(!config.costPerMile) {
@@ -65,7 +65,7 @@ function Fleet(config) {
   this.maxActiveTrips = config.maxActiveTrips;
   this.simulationInterval = moment.duration(config.simulationInterval, 'seconds');
   this.tripMaxAdvancedNotice = moment.duration(5, 'minutes');
-  this.removalAge = moment.duration(5, 'minutes');
+  this.removalAge = moment.duration(1, 'minute');
   this.retryInterval = moment.duration(3, 'minutes');
   this.missedPeriod = moment.duration(15, 'minutes');
   this.criticalPeriod = moment.duration(15, 'minutes');
@@ -106,12 +106,13 @@ Fleet.prototype.simulate = function() {
     .processQueue()
     .bind(this)
     .then(function(){
+      this.healthCheck();
       return this.updateReturningDriversLocation();
     });
 };
 
 Fleet.prototype.generateRandomTrips = function() {
-  if(this.queue.length >= this.maxActiveTrips) {
+  if(this.queue.length >= this.maxActiveTrips || this.possibleTrips.length === 0) {
     return;
   }
   
@@ -136,6 +137,7 @@ Fleet.prototype.generateRandomTrips = function() {
 
 Fleet.prototype.generateRandomTrip = function(now) {
   var passenger = this.passengers[Math.floor(Math.random()*this.passengers.length)];
+  passenger = {id: passenger, name: passenger};
   var fromTo = this.possibleTrips[Math.floor(Math.random()*this.possibleTrips.length)];
   var pickupTime = moment(now).add(this.tripMaxAdvancedNotice);
   var from = new Location(fromTo.start.lat, fromTo.start.lng);
@@ -143,20 +145,20 @@ Fleet.prototype.generateRandomTrip = function(now) {
   this.queueTrip(this.createTrip(passenger, pickupTime, from, to));
 };
 
-Fleet.prototype.createTrip = function(passengerName, pickupTime, from, to, foreignId) {
+Fleet.prototype.createTrip = function(passenger, pickupTime, from, to, foreignId) {
   var trip = new Trip({
     id: foreignId ? this.generatePrivateId(foreignId) : this.generateTripId(),
     idNumber: foreignId ? undefined : this.nextId,
     partner: this.partner,
-    origination: 'local',
+    origination: foreignId ? 'foreign' : 'local',
     pickupLocation: from,
     pickupTime: pickupTime,
-    passenger: { id: passengerName, name: passengerName },
+    passenger: passenger,
     dropoffLocation: to,
     paymentMethod: 'cash',
     fleet: this
   });
-  logger.log('sim', passengerName + ' requests to be picked up at ' + from + ' on ' + pickupTime.format() + ' and dropped off at ' + to);
+  logger.log('sim', passenger.id + ' requests to be picked up at ' + from + ' on ' + pickupTime.format() + ' and dropped off at ' + to);
   return trip;
 };
 
@@ -164,11 +166,11 @@ Fleet.prototype.queueTrip = function(trip) {
   if(this.availableDrivers.length === 0 && trip.origination === 'foreign') {
     return false;
   }
-  logger.log('sim', 'Queueing ' + trip.id);
-  this.queue.push(trip);
   if(this.partner.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
     throw new Error('sim', 'Trip ' + trip.id + ' already exists in active trips');
   }
+  logger.log('sim', 'Queueing ' + trip.id);
+  this.queue.push(trip);
   this.partner.addTrip(trip);
   trip.updateStatus(false, 'queued');
   return true;
@@ -194,6 +196,8 @@ Fleet.prototype.processTrip = function(trip) {
     case 'pickedup':
       return this.processStatusPickedUp(trip);
     case 'complete':
+    case 'rejected':
+    case 'cancelled':
       //wait to be removed by removeIfTripOld
       break;
     default:
@@ -211,7 +215,7 @@ Fleet.prototype.processStatusQueued = function(trip) {
 
 Fleet.prototype.dispatchRetryIntervalReached = function(trip) {
   var tryAgain = moment(trip.lastDispatchAttempt).add(this.retryInterval);
-  return trip.lastDispatchAttempt === null || moment().isAfter(tryAgain);
+  return !trip.lastDispatchAttempt || moment().isAfter(tryAgain);
 };
 
 Fleet.prototype.dispatch = function(trip) {
@@ -232,11 +236,18 @@ Fleet.prototype.dispatch = function(trip) {
     .tryDispatchLocally(trip)
     .bind(this)
     .then(function(success){
-      if(!success && trip.origination === 'local') {
-        return this.partner.tryToDispatchToForeignProvider(trip);
-      } else {
+      if(success) {
         return trip.updateStatus(true, 'dispatched', trip.driver.location, 
             trip.pickupTime);
+      } else if(trip.origination === 'local') {
+        return this
+          .partner
+          .tryToDispatchToForeignProvider(trip)
+          .then(function(success){
+            if(success) {
+              return trip.updateStatus(false, 'dispatched');
+            }
+          });
       }
     });
 };
@@ -269,9 +280,13 @@ Fleet.prototype.tryDispatchLocally = function(trip) {
   }
   if(this.availableDrivers.length > 0) {
     this.dispatchToFirstAvailableDriver(trip);
-    return this
-      .partner
-      .tryToCreateLocalTripAtTripThru(trip);
+    if(trip.origination === 'local') {
+      return this
+        .partner
+        .tryToCreateLocalTripAtTripThru(trip);
+    } else {
+      return Promise.resolve(true);
+    }
   } else {
     return Promise.resolve(false);
   }
@@ -394,7 +409,7 @@ Fleet.prototype.makeTripPickedUp = function(trip) {
   return this
     .updateDriverRouteAndGetETA(trip, trip.dropoffLocation)
     .then(function(eta){
-      return trip.updateStatus(true, 'pickedup', trip.driver.location.id, eta);
+      return trip.updateStatus(true, 'pickedup', trip.driver.location, eta);
     });
 };
 
@@ -453,14 +468,15 @@ Fleet.prototype.removeOldNonActiveTrips = function() {
 };
 
 Fleet.prototype.removeTripIfOld = function(index, trip, age) {
-  if(age.asMinutes() > this.removalAge) {
-    logger.log('sim', "Since old, remove " + trip.id);
-    this.queue.splice(index-1, 1);
+  if(age.asMinutes() > this.removalAge.asMinutes()) {
+    var queuelength = this.queue.length;
+    this.queue.splice(index, 1);
+    logger.log('sim', "Since old, remove " + trip.id + '. QueueB: ' + queuelength + ', QueueA: ' + this.queue.length);
   }
 };
 
 Fleet.prototype.agetSinceCompletedClockHasNotBeenSet = function(trip) {
-  return trip.dropoffTime === null;
+  return !trip.dropoffTime;
 };
 
 Fleet.prototype.startTheAgeSinceCompletedClockFromNow = function(trip) {
@@ -475,7 +491,7 @@ Fleet.prototype.updateReturningDriversLocation = function() {
     if(this.driverHomeOfficeReached(driver)) {
       logger.log('sim', 'Driver ' + driver.name + ' has reached the home office');
       this.availableDrivers.push(driver);
-      this.returningDrivers.splice(len-1, 1);
+      this.returningDrivers.splice(len, 1);
     } else if(this.driverUpdateIntervalReached(driver)) {
       driver.lastUpdate = moment();
       logger.log(driver.name, 'Update ' + driver.location.id);
@@ -529,13 +545,22 @@ Fleet.prototype.getPickupEta = function(trip) {
     delay = this.expectedDelayWhenNoDriversAvailable;
   } else {
     startLocation = this.availableDrivers[0].location;
-    delay = 0;
+    delay = moment.duration(0, 'seconds');
   }
   return maptools
     .getRoute(startLocation, trip.pickupLocation)
     .then(function(route){
-      return route.duration + delay;
+      return route.duration.add(delay);
     });
+};
+
+Fleet.prototype.healthCheck = function() {
+  logger.log(this.id, 'Health check: ' +
+      'Queue: ' + this.queue.length + 
+      ', Active trips: ' + Object.keys(this.partner.activeTripsByPublicId).length +
+      ', Available drivers: ' + this.availableDrivers.length +
+      ', Returning drivers: ' + this.returningDrivers.length
+  );
 };
 
 module.exports.Fleet = Fleet;

@@ -48,60 +48,72 @@ Partner.prototype.getPartnerInfo = function(request, cb) {
   cb(TripThruApiFactory.createGetPartnerInfoResponse(this.fleets));
 };
 
+Partner.prototype.setPartnerInfoAtTripThru = function(cb) {
+  var request = TripThruApiFactory.createGetPartnerInfoResponse(this.fleets);
+  this
+    .gatewayClient
+    .setPartnerInfo(request)
+    .then(function(res){
+      cb(res);
+    });
+};
+
 Partner.prototype.dispatchTrip = function(request, cb) {
   var trip = TripThruApiFactory.createTripFromRequest(request, 'dispatch');
+  logger.log(trip.publicId, this.id + ' received dispatch request');
   
   if(this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
     cb(TripThruApiFactory.createResponseFromTrip(null, null, 
         'Already exists', resultCodes.rejected));
     return;
   }
+  var dispatchPromise;
   if (trip.driver && trip.driver.id) {
-    this.dispatchToSpecificDriver(trip, this.returnDispatchTripResponse(trip, cb));
+    dispatchPromise = this.dispatchToSpecificDriver(trip);
   } else if(trip.fleet && trip.fleet.id) {
-    this.dispatchToSpecificFleet(trip, this.returnDispatchTripResponse(trip, cb));
+    dispatchPromise = this.dispatchToSpecificFleet(trip);
   } else {
-    this.dispatchToFirstFleetThatServes(trip, this.returnDispatchTripResponse(trip, cb));
-  }
-};
-
-Partner.prototype.returnDispatchTripResponse = function(trip, cb) {
-  var response;
-  if(trip) {
-    response = TripThruApiFactory.createResponseFromTrip(trip, 'dispatch');
-  } else {
-    response = TripThruApiFactory.createResponseFromTrip(null, null, 
-        'Dispatch failed', resultCodes.rejected);
-  }
-  cb(response);
-};
-
-Partner.prototype.dispatchToSpecificDriver = function(trip, cb) {
-  cb(null);
-};
-
-Partner.prototype.dispatchToSpecificFleet = function(trip, cb) {
-  logger.log(trip.publicId, 'Dispatching to fleet ' + trip.fleet.id);
-  var fleet = this.fleetsById[trip.fleet.id];
-  if(!fleet) {
-    cb(null);
+    dispatchPromise = this.dispatchToFirstFleetThatServes(trip);
   }
   
-  if(fleet.servesLocation(trip.pickupLocation)) {
-    fleet
-      .createTrip(trip.passenger, trip.pickupTime, trip.pickupLocation, trip.dropoffLocation, trip.publicId)
-      .then(function(t){
-        var response = false;
-        if(fleet.queueTrip(t)) {
-          response = true;
-          logger.log(t.id, 'DispatchTrip successful');
-        }
-        cb(response);
-      });
-  }
+  dispatchPromise
+    .then(function(t){
+      if(t) {
+        logger.log(request.id, 'Dispatched successfully');
+        cb(TripThruApiFactory.createResponseFromTrip(t, 'dispatch'));
+      } else {
+        logger.log(request.id, 'Dispatch unsuccessful');
+        cb(TripThruApiFactory.createResponseFromTrip(null, null, 
+            'Dispatch unsuccessful', resultCodes.rejected));
+      }
+    })
+    .error(function(err){
+      console.log(request.id, 'Dispatch error: ' + err);
+      cb(TripThruApiFactory.createResponseFromTrip(null, null, 
+            'Dispatch failed', resultCodes.rejected));
+    });
 };
 
-Partner.prototype.dispatchToFirstFleetThatServes = function(trip, cb) {
+Partner.prototype.dispatchToSpecificDriver = function(trip) {
+  logger.log(trip.publicId, 'Dispatching to specific driver ' + trip.driver.id);
+  throw new Error('Not implemented');
+};
+
+Partner.prototype.dispatchToSpecificFleet = function(trip) {
+  logger.log(trip.publicId, 'Dispatching to fleet ' + trip.fleet.id);
+  var fleet = this.fleetsById[trip.fleet.id];
+  
+  if(fleet && fleet.servesLocation(trip.pickupLocation)) {
+    var t = fleet.createTrip(trip.passenger, trip.pickupTime, trip.pickupLocation, 
+          trip.dropoffLocation, trip.publicId);
+    if(fleet.queueTrip(t)) {
+      return Promise.resolve(t);
+    }
+  }
+  return Promise.resolve(null);
+};
+
+Partner.prototype.dispatchToFirstFleetThatServes = function(trip) {
   logger.log(trip.publicId, 'Dispatching to first fleet that serves');
   for(var i = 0; i < this.fleets.length; i++) {
     var fleet = this.fleets[i];
@@ -111,22 +123,22 @@ Partner.prototype.dispatchToFirstFleetThatServes = function(trip, cb) {
     }
   }
   if(trip.fleet) {
-    cb(this.dispatchToSpecificFleet(trip, cb));
-  } else {
-    cb(null);
+    return this.dispatchToSpecificFleet(trip);
   }
+  Promise.resolve(null);
 };
 
 Partner.prototype.getTripStatus = function(request, cb) {
   var trip = TripThruApiFactory.createTripFromRequest(request, 'get-trip-status');
   var response;
-  if(!this.activeTripsById.hasOwnProperty(trip.publicId)) {
+  if(!this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
     response = TripThruApiFactory.createResponseFromTrip(null, null, 
         'Not found', resultCodes.notFound);
   } else {
-    var t = this.activeTripsById[trip.publicId];
-    response = TripThruApiFactory.createResponseFromTrip(t, 'get-trip-status');
-    logger.log(t.id, 'Received get status request');
+    var t = this.activeTripsByPublicId[trip.publicId];
+    response = TripThruApiFactory.createResponseFromTrip(t, 'get-trip-status', 
+        null, null, {partner: this});
+    logger.log(t.id, this.id + ' received get status request');
   }
   cb(response);
 };
@@ -134,14 +146,18 @@ Partner.prototype.getTripStatus = function(request, cb) {
 Partner.prototype.updateTripStatus = function(request, cb) {
   var trip = TripThruApiFactory.createTripFromRequest(request, 'update-trip-status');
   
-  if(this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
+  if(!this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
     cb(TripThruApiFactory.createResponseFromTrip(null, null, 
         'Not found', resultCodes.notFound));
     return;
   }
   var t = this.activeTripsByPublicId[trip.publicId];
-  t.updateStatus(false, trip.status, trip.driver.location, trip.eta);
-  logger.log(t.id, 'Received status update (' + t.status + ')');
+  var driverLocation;
+  if(trip.driver && trip.driver.location) {
+    driverLocation = trip.driver.location;
+  }
+  t.updateStatus(false, trip.status, driverLocation, trip.eta);
+  logger.log(t.id, this.id + ' received status update (' + request.status + ')');
   cb(TripThruApiFactory.createResponseFromTrip(t, 'update-trip-status'));
 };
 
@@ -150,13 +166,13 @@ Partner.prototype.getTrip = function(request, cb) {
 };
 
 Partner.prototype.quoteTrip = function(request, cb) {
-  logger.log(request.id, 'QuoteTrip received');
+  logger.log(request.id, this.id + ' received quotetrip');
   cb(TripThruApiFactory.createResponseFromQuoteRequest(request));
   
   TripThruApiFactory
     .createUpdateQuoteRequestFromQuoteRequest(request, this.fleets)
     .bind(this)
-    .delay(500)
+    .delay(100)
     .then(function(updateQuoteRequest){
       this.gatewayClient.updateQuote(updateQuoteRequest);
     });
