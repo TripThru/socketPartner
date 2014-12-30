@@ -4,7 +4,8 @@ var Interface = require('./interface').Interface;
 var IFleet = require('./fleet').IFleet;
 var Fleet = require('./fleet').Fleet;
 var logger = require('./logger');
-var store = require('./models/trips');
+var trips = require('./models/trips');
+var quotes = require('./models/quotes');
 var TripThruApiFactory = require('./tripthru_api_factory');
 var codes = require('./codes');
 var Promise = require('bluebird');
@@ -88,7 +89,7 @@ Partner.prototype.dispatchTrip = function(request, cb) {
       }
     })
     .error(function(err){
-      console.log(request.id, 'Dispatch error: ' + err);
+      logger.log(request.id, 'Dispatch error: ' + err);
       cb(TripThruApiFactory.createResponseFromTrip(null, null, 
             'Dispatch failed', resultCodes.rejected));
     });
@@ -179,7 +180,28 @@ Partner.prototype.quoteTrip = function(request, cb) {
 };
 
 Partner.prototype.updateQuote = function(request, cb) {
-  throw new Error('Not implemented');
+  logger.log(request.id, this.id + ' received quote update');
+  quotes
+    .getById(request.id)
+    .bind({})
+    .then(function(q){
+      if(q) {
+        this.quote = q;
+        var partnerQuote = TripThruApiFactory.createQuoteFromRequest(request, 
+            'update', {quote: q});
+        return quotes.update(this.quote);
+      }
+      throw new Error('Quote not found');
+    })
+    .then(function(){
+      var response = TripThruApiFactory.createResponseFromQuote(this.quote, 'update');
+      cb(response);
+    })
+    .error(function(err){
+      var response = TripThruApiFactory.createResponseFromQuote(null, null, 
+          resultCodes.unknownError, 'unknown error ocurred');
+      cb(response);
+    });
 };
 
 Partner.prototype.getQuote = function(request, cb) {
@@ -223,11 +245,11 @@ Partner.prototype.tryToDispatchToForeignProvider = function(trip, partnerId) {
 
 Partner.prototype.addTrip = function(trip) {
   this.activeTripsByPublicId[trip.publicId] = trip;
-  store.createTrip(trip);
+  trips.createTrip(trip);
 };
 
 Partner.prototype.deactivateTrip = function(trip, status) {
-  //store.updateTrip(trip); Fix bug
+  //trips.updateTrip(trip); Fix bug
   delete this.activeTripsByPublicId[trip.publicId];
 };
 
@@ -255,6 +277,111 @@ PartnerFactory.prototype.createPartner = function(gatewayClient, configuration) 
     gatewayClient: gatewayClient
   });
   return partner;
+};
+
+//This are helper function used only by the bookings website, to simulate a sync
+//quoting process simplifying the bookings website adaptation to the Node api
+
+Partner.prototype.bookingsQuoteTrip = function(request, cb) {
+  var quote = TripThruApiFactory.createQuoteFromRequest(request, 'quote');
+  quotes
+    .getById(quote.id)
+    .bind(this)
+    .then(function(res){
+      return quotes.add(quote);
+    })
+    .then(function(res){
+      return this.gatewayClient.quoteTrip(request);
+    })
+    .then(function(res){
+       if(res.result !== resultCodes.ok) {
+         cb(res);
+         return;
+       }
+       return TripThruApiFactory
+         .createUpdateQuoteRequestFromQuoteRequest(request, this.fleets)
+         .delay(3000) //wait to receive quote update from tripthru
+         .then(function(res){
+           quotes
+             .getById(quote.id)
+             .then(function(q){
+               for(var i = 0; i < q.receivedQuotes.length; i++) {
+                 res.quotes.push(q.receivedQuotes[i]);
+               }
+               res.result = resultCodes.ok;
+               cb(res);
+             });
+         });
+    })
+    .error(function(err){
+      var response = TripThruApiFactory.createResponseFromQuote(null, null, 
+          resultCodes.unknownError, 'unknown error ocurred');
+      cb(response);
+    });
+};
+
+Partner.prototype.bookingsGetTripStatus = function(request, cb) {
+  var t = TripThruApiFactory.createTripFromRequest(request, 'get-trip-status');
+  if(!this.activeTripsByPublicId.hasOwnProperty(t.publicId)) {
+    var response = TripThruApiFactory.createResponseFromTrip(null, null, 
+        'Not found', resultCodes.notFound);
+    cb(response);
+    return;
+  }
+  
+  var trip = this.activeTripsByPublicId[t.publicId];
+  if(trip.service === 'local' || trip.status === 'booking') {
+    var response = TripThruApiFactory.createResponseFromTrip(trip, 'get-trip-status', 
+        null, null, {partner: this});
+    cb(response);
+  } else {
+    this
+      .gatewayClient
+      .getTripStatus(request)
+      .then(function(response){
+        cb(response);
+      });
+  }
+};
+
+Partner.prototype.bookingsDispatchTrip = function(request, cb) {
+  var trip = TripThruApiFactory.createTripFromRequest(request, 'dispatch');
+  if(request.partner.id === this.id) {
+    this
+      .dispatchToFirstFleetThatServes(trip)
+      .then(function(t){
+        if(t) {
+          t.origination = 'local';
+          t.service = 'local';
+          cb(TripThruApiFactory.createResponseFromTrip(t, 'dispatch'));
+        } else {
+          cb(TripThruApiFactory.createResponseFromTrip(null, null, 
+              'Dispatch unsuccessful', resultCodes.rejected));
+        }
+      })
+      .error(function(err){
+        cb(TripThruApiFactory.createResponseFromTrip(null, null, 
+              'Dispatch failed', resultCodes.rejected));
+      });
+  } else {
+    var fleet = this.fleets[0];
+    var t = fleet.createTrip(trip.passenger, trip.pickupTime, trip.pickupLocation, 
+        trip.dropoffLocation, trip.publicId);
+    t.origination = 'local';
+    t.service = 'foreign';
+    if(!fleet.queueTrip(t)) {
+      cb(TripThruApiFactory.createResponseFromTrip(null, null, 
+          'Dispatch unsuccessful', resultCodes.rejected));
+    } else {
+      t.updateStatus(false, 'booking');
+      this
+        .tryToDispatchToForeignProvider(t, request.partner.id)
+        .then(function(success){
+          t.updateStatus(false, 'dispatched');
+          cb(TripThruApiFactory.createResponseFromTrip(t, 'dispatch'));
+        });
+    }
+  }
 };
 
 module.exports.PartnerFactory = new PartnerFactory();

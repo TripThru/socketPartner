@@ -15,7 +15,9 @@ mongoose.connect(config.db.url, function (err, res) {
 var Trip = mongoose.model('trips', schemas.trip);
 Promise.promisifyAll(Trip);
 Promise.promisifyAll(Trip.prototype);
-
+var Quote = mongoose.model('quotes', schemas.quote);
+Promise.promisifyAll(Quote);
+Promise.promisifyAll(Quote.prototype);
 var Route = mongoose.model('routes', schemas.route);
 Promise.promisifyAll(Route);
 Promise.promisifyAll(Route.prototype);
@@ -47,6 +49,18 @@ Store.prototype.updateTrip = function(trip) {
 Store.prototype.getTrip = function(trip) {
   return get(Trip, trip);
 };
+  
+Store.prototype.createQuote = function(quote) {
+  return create(Quote, quote);
+};
+  
+Store.prototype.updateQuote = function(quote) {
+  return update(Quote, quote);
+};
+    
+Store.prototype.getQuoteBy = function(query) {
+  return get(Quote, query);
+};
 
 Store.prototype.createRoute = function(route) {
   return create(Route, route);
@@ -62,6 +76,8 @@ Store.prototype.getRoute = function(route) {
 
 Store.prototype.clear = function() {
   mongoose.connection.db.dropCollection('trips');
+  mongoose.connection.db.dropCollection('quotes');
+  mongoose.connection.db.dropCollection('users');
 };
 
 module.exports = new Store();

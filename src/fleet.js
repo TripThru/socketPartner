@@ -195,6 +195,9 @@ Fleet.prototype.processTrip = function(trip) {
       return this.processStatusEnroute(trip);
     case 'pickedup':
       return this.processStatusPickedUp(trip);
+    case 'booking':
+      //special case for trips created through booking website dispatched
+      //to foreign provider
     case 'complete':
     case 'rejected':
     case 'cancelled':
@@ -262,8 +265,12 @@ Fleet.prototype.criticalPeriodNotYetReached = function(trip) {
 
 Fleet.prototype.cancelTrip = function(trip) {
   logger.log(trip.id, 'Missed period reached: -- so cancel');
-  var shouldNotifyPartner = trip.service === 'foreign';
+  var shouldNotifyPartner = trip.service === 'foreign' && this.isActiveStatus(trip.status);
   return trip.updateStatus(shouldNotifyPartner, 'cancelled');
+};
+
+Fleet.prototype.isActiveStatus = function(status) {
+  return status === 'dispatched' || status === 'enroute' || status === 'pickedup';
 };
 
 Fleet.prototype.tryDispatchLocally = function(trip) {
@@ -550,7 +557,7 @@ Fleet.prototype.getPickupEta = function(trip) {
   return maptools
     .getRoute(startLocation, trip.pickupLocation)
     .then(function(route){
-      return route.duration.add(delay);
+      return trip.pickupTime.add(route.duration.add(delay));
     });
 };
 

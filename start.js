@@ -3,6 +3,7 @@ if(!partnerConfigName) {
   throw new Error('Please specify a partner configuration name');
 }
 var logger = require('./src/logger');
+var server = require('./server');
 var fs = require('fs');
 var GatewayClient = require('./src/gateway_client');
 var PartnerFactory = require('./src/partner').PartnerFactory;
@@ -45,19 +46,29 @@ function runOnePartner(name) {
       });
     }
   });
+  
+  return partner;
 }
 
 function endsWith(str, suffix) {
   return str.indexOf(suffix, str.length - suffix.length) !== -1;
 }
 
+function startServer(partnersById){
+  server.init(partnersById);
+}
+
 function runAllPartners() {
   var files = fs.readdirSync(configDirectory);
+  var partnersById = [];
   for(var i = 0; i < files.length; i++) {
     if(endsWith(files[i].toString(), '.js')) {
-      runOnePartner(files[i]);
+      var partner = runOnePartner(files[i]);
+      partnersById[partner.id] = partner;
     }
   }
+  logger.log('init', 'Starting express...');
+  startServer(partnersById);
 }
 
 var configName = process.argv[2];

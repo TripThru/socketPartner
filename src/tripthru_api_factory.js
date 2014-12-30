@@ -244,7 +244,7 @@ function createTripFromQuoteRequest(request, fleet) {
   var trip = {
     id: request.id,
     pickupLocation: request.pickupLocation,
-    pickupTime: request.pickupTime,
+    pickupTime:  getMomentFromISOString(request.pickupTime),
     paymentMethod: request.paymentMethod,
     passenger: request.passenger,
     dropoffLocation: request.dropoffLocation,
@@ -292,7 +292,7 @@ function createUpdateQuoteRequestFromQuoteRequest(request, fleets) {
     }
     for(var j = 0; j < fleet.vehicleTypes.length; j++) {
       var vehicleType = fleet.vehicleTypes[j];
-      if(request.vehicleType === vehicleType) {
+      if(!request.vehicleType || request.vehicleType === vehicleType) {
         var trip = createTripFromQuoteRequest(request, fleet);
         trip.vehicleType = vehicleType;
         tasks.push(trip);
@@ -305,6 +305,7 @@ function createUpdateQuoteRequestFromQuoteRequest(request, fleets) {
     .runInSequence(tasks, function(trip){
       return createQuoteFromTrip(trip)
         .then(function(quote){
+          quote.eta = getISOStringFromMoment(quote.eta);
           quotes.push(quote);
         });
     })
@@ -317,9 +318,144 @@ function createUpdateQuoteRequestFromQuoteRequest(request, fleets) {
     });
 }
 
+function createQuoteFromQuoteRequest(request) {
+  var quote = {
+    id: request.id,
+    request: {
+        clientId: request.clientId,
+        id: request.id,
+        pickupLocation: apiLocation(request.pickupLocation),
+        pickupTime: getMomentFromISOString(request.pickupTime),
+        passenger: idName(request.passenger),
+        dropoffLocation: apiLocation(request.dropoffLocation),
+        vehicleType: request.vehicleType
+    },
+    receivedQuotes: []
+  };
+  return quote;
+}
+
+function createQuoteFromUpdateQuoteRequest(request, quote) {
+  if(request.quotes.length > 0) {
+    for(var i = 0; i < request.quotes.length; i++) {
+      var q = request.quotes[i];
+      var quoteUpdate = {
+          partner: idName(q.partner),
+          fleet: idName(q.fleet),
+          eta: getMomentFromISOString(q.eta),
+          vehicleType: q.vehicleType,
+          price: q.price,
+          distance: q.distance
+      };
+      if(q.duration) quoteUpdate.duration = moment.duration(q.duration, 'seconds');
+      if(q.driver) quoteUpdate.driver = idName(q.driver);
+      quote.receivedQuotes.push(quoteUpdate);
+    }
+  }
+  return quote;
+}
+
+function createQuoteFromGetQuoteRequest(request) {
+  var r = {
+      id: request.id
+  };
+  return r;
+}
+
+function createQuoteResponseFromQuote(request) {
+  return successResponse();
+}
+
+function createGetQuoteResponseFromQuote(quote) {
+  var r = {
+    id: quote.id,
+    clientId: tripthruClientId,
+    quotes: []
+  };
+  for(var i = 0; quote.receivedQuotes.length; i++) {
+    var q = quote.receivedQuotes[i];
+    r.quotes.push({
+      partner: idName(q.partner),
+      fleet: idName(q.fleet),
+      driver: idName(q.driver),
+      passenger: idName(q.passenger),
+      eta: getISOStringFromMoment(q.eta),
+      vehicleType: q.vehicleType,
+      price: q.price,
+      distance: q.distance,
+      duration: q.duration.asSeconds()
+    });
+  }
+  return r;
+}
+
+function createUpdateQuoteResponseFromQuote(quote) {
+  return successResponse();
+}
+
+function createQuoteRequestFromQuote(quote) {
+  throw new Error('Not implemented');
+}
+
+function createUpdateQuoteRequestFromQuote(quote) {
+  return createGetQuoteRequestFromQuote(quote);
+}
+
+function createGetQuoteRequestFromQuote(quote) {
+  throw new Error('Not implemented');
+}
+
+function createRequestFromQuote(quote, type, args) {
+  switch(type) {
+    case 'quote':
+      return createQuoteRequestFromQuote(quote);
+    case 'update':
+      return createUpdateQuoteRequestFromQuote(quote);
+    case 'get':
+      return createGetQuoteRequestFromQuote(quote);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
+}
+
+function createResponseFromQuote(quote, type, message, errorCode) {
+  if(errorCode) {
+    return failResponse(message, errorCode);
+  }
+  switch(type) {
+    case 'quote':
+      return createQuoteResponseFromQuote(quote);
+    case 'update':
+      return createUpdateQuoteResponseFromQuote(quote);
+    case 'get':
+      return createGetQuoteResponseFromQuote(quote);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
+}
+
+function createQuoteFromRequest(quote, type, args) {
+  switch(type) {
+    case 'quote':
+      return createQuoteFromQuoteRequest(quote);
+    case 'update':
+      if(!args || !args.quote) {
+        throw new Error('Need quote object to update');
+      }
+      return createQuoteFromUpdateQuoteRequest(quote, args.quote);
+    case 'get':
+      return createQuoteFromGetQuoteRequest(quote);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
+}
+
 module.exports.createGetPartnerInfoResponse = createGetPartnerInfoResponse;
 module.exports.createRequestFromTrip = createRequestFromTrip;
 module.exports.createResponseFromTrip = createResponseFromTrip;
 module.exports.createTripFromRequest = createTripFromRequest;
 module.exports.createResponseFromQuoteRequest = createResponseFromQuoteRequest;
 module.exports.createUpdateQuoteRequestFromQuoteRequest = createUpdateQuoteRequestFromQuoteRequest;
+module.exports.createRequestFromQuote = createRequestFromQuote;
+module.exports.createResponseFromQuote = createResponseFromQuote;
+module.exports.createQuoteFromRequest = createQuoteFromRequest;

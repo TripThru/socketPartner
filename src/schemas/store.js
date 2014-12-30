@@ -56,7 +56,40 @@ var trip = new mongoose.Schema({
   state: { type: String, enum: common.tripState }
 });
 
+
+ var quoteResponseSchema = {
+      partner: {
+        id: { type: String, trim: true },
+        name: String
+      },
+      fleet: {
+        id: { type: String, trim: true },
+        name: String
+      },
+      driver: {
+        id: { type: String, trim: true },
+        name: String
+      },
+      passenger: {
+        id: { type: String, trim: true },
+        name: String
+      },
+      eta: Date,
+      vehicleType: { type: String, enum: common.vehicleTypes },
+      price: Number,
+      distance: Number,
+      duration: Number
+    };
+  
+var quote = new mongoose.Schema({
+    id: { type: String, trim: true, required: true },
+    state: { type: String, enum: common.quoteState },
+    receivedQuotes: [quoteResponseSchema],
+    autoDispatch: Boolean
+  });
+
 module.exports = {
     route: route,
-    trip: trip
+    trip: trip,
+    quote: quote
 };
