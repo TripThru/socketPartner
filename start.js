@@ -2,6 +2,7 @@ var partnerConfigName = process.argv[2];
 if(!partnerConfigName) {
   throw new Error('Please specify a partner configuration name');
 }
+var healthcheck = require('./healthcheck');
 var logger = require('./src/logger');
 var server = require('./server');
 var fs = require('fs');

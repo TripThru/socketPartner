@@ -11,8 +11,8 @@ module.exports = {
     name: 'Mellow',
     baseCost: 3,
     costPerMile: 3,
-    tripsPerHour: 1,
-    maxActiveTrips: 1,
+    tripsPerHour: 1000,
+    maxActiveTrips: 100,
     coverage: {
       center: {
         lat: 37.78906,

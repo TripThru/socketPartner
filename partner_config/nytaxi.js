@@ -11,8 +11,8 @@ module.exports = {
     name: 'NY Taxi',
     baseCost: 3,
     costPerMile: 3,
-    tripsPerHour: 1,
-    maxActiveTrips: 1,
+    tripsPerHour: 1000,
+    maxActiveTrips: 100,
     coverage: {
       center: {
         lat: 40.769004,
