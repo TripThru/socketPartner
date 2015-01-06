@@ -497,6 +497,8 @@ Fleet.prototype.updateReturningDriversLocation = function() {
     this.updateDriverReturningLocation(driver);
     if(this.driverHomeOfficeReached(driver)) {
       logger.log('sim', 'Driver ' + driver.name + ' has reached the home office');
+      driver.route = null;
+      driver.routeStartTime = null;
       this.availableDrivers.push(driver);
       this.returningDrivers.splice(len, 1);
     } else if(this.driverUpdateIntervalReached(driver)) {
