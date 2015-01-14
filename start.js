@@ -7,7 +7,7 @@ var logger = require('./src/logger');
 var server = require('./server');
 var fs = require('fs');
 var GatewayClient = require('./src/gateway_client');
-var PartnerFactory = require('./src/partner').PartnerFactory;
+var PartnerFactory = require('./src/partner_factory');
 var configDirectory = './partner_config/';
 
 function start(partner, interval) {

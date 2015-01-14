@@ -88,8 +88,14 @@ var quote = new mongoose.Schema({
     autoDispatch: Boolean
   });
 
+var user = new mongoose.Schema({
+  id: { type: String, trim: true, required: true },
+  token: { type: String, trim: true, required: true }
+});
+
 module.exports = {
     route: route,
     trip: trip,
-    quote: quote
+    quote: quote,
+    user: user
 };

@@ -258,27 +258,6 @@ Partner.prototype.updateForeignPartner = function(trip) {
   return this.gatewayClient.updateTripStatus(request);
 };
 
-function PartnerFactory() {
-  
-}
-
-PartnerFactory.prototype.createPartner = function(gatewayClient, configuration) {
-  var fleets = [];
-  for(var i = 0; i < configuration.fleets.length; i++) {
-    var fleet = configuration.fleets[i];
-    fleet.simulationInterval = configuration.simulationInterval;
-    fleets.push(new Fleet(fleet));
-  }
-  var partner = new Partner({
-    id: configuration.clientId.replace(/ /g, ''),
-    name: configuration.name,
-    preferedPartnerId: configuration.preferedPartnerId,
-    fleets: fleets,
-    gatewayClient: gatewayClient
-  });
-  return partner;
-};
-
 //This are helper function used only by the bookings website, to simulate a sync
 //quoting process simplifying the bookings website adaptation to the Node api
 
@@ -384,4 +363,4 @@ Partner.prototype.bookingsDispatchTrip = function(request, cb) {
   }
 };
 
-module.exports.PartnerFactory = new PartnerFactory();
+module.exports = Partner;

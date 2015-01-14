@@ -21,6 +21,9 @@ Promise.promisifyAll(Quote.prototype);
 var Route = mongoose.model('routes', schemas.route);
 Promise.promisifyAll(Route);
 Promise.promisifyAll(Route.prototype);
+var User = mongoose.model('users', schemas.user);
+Promise.promisifyAll(User);
+Promise.promisifyAll(User.prototype);
 
 function create(model, data) {
   return model.createAsync(data);
@@ -74,10 +77,13 @@ Store.prototype.getRoute = function(route) {
   return get(Route, route);
 };
 
+Store.prototype.createUser = function(user) {
+  return create(User, user);
+};
+
 Store.prototype.clear = function() {
   mongoose.connection.db.dropCollection('trips');
   mongoose.connection.db.dropCollection('quotes');
-  mongoose.connection.db.dropCollection('users');
 };
 
 module.exports = new Store();

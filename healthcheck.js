@@ -1,5 +1,5 @@
-var memwatch = require('memwatch');
-/*
+/*var memwatch = require('memwatch');
+
 var agent = require('webkit-devtools-agent');
 agent.start({
   port: 9999,
@@ -7,7 +7,7 @@ agent.start({
   ipc_port: 3333,
   verbose: true
 });
-*/
+
 memwatch.on('leak', function(info) { 
   console.log('### Memwatch leak: ', info);
 });
@@ -19,3 +19,4 @@ memwatch.on('stats', function(stats) {
   console.log('### Memwatch diff: ', diff);
   console.log('### Details ', diff.change.details);
 });
+*/

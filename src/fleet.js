@@ -6,9 +6,9 @@ var maptools = require('./map_tools').MapTools;
 var Location = require('./map_tools').Location;
 var Promise = require('bluebird');
 var PromiseHelper = require('./promise_helper');
+var simulationData = require('./models/simulation_data');
 
-var IFleet = new Interface('fleet', ['simulate',
-                                     'setPartner']);
+var IFleet = new Interface('fleet', ['simulate','setPartner']);
 
 function Fleet(config) {
   
@@ -18,23 +18,20 @@ function Fleet(config) {
   if(!config.name) {
     throw new Error('Name is required');
   }
+  if(!config.city) {
+    throw new Error('City is required');
+  }
   if(!config.location) {
     throw new Error('Location is required');
   }
   if(!config.coverage || !config.coverage.center || !config.coverage.radius) {
     throw new Error('Coverage is required');
   }
-  if(!config.drivers || config.drivers.length === 0) {
-    throw new Error('Drivers are required');
-  }
-  if(!config.passengers || config.passengers.length === 0) {
-    throw new Error('Passengers are required');
+  if(!config.maxDrivers) {
+    throw new Error('Max drivers number is required');
   }
   if(!config.vehicleTypes || config.vehicleTypes.length === 0) {
     throw new Error('Vehicle types are required');
-  }
-  if(!config.possibleTrips) {
-    throw new Error('Possible trips are required');
   }
   if(!config.costPerMile) {
     throw new Error('Cost per mile is required');
@@ -54,15 +51,15 @@ function Fleet(config) {
   
   this.id = config.id.replace(/ /g, '');
   this.name = config.name;
+  this.city = config.city;
   this.location = new Location(config.location.lat, config.location.lng);
   this.coverage = config.coverage;
-  this.passengers = config.passengers;
   this.vehicleTypes = config.vehicleTypes;
-  this.possibleTrips = config.possibleTrips;
   this.costPerMile = config.costPerMile;
   this.baseCost = config.baseCost;
   this.tripsPerHour = config.tripsPerHour;
   this.maxActiveTrips = config.maxActiveTrips;
+  this.maxDrivers = config.maxDrivers;
   this.simulationInterval = moment.duration(config.simulationInterval, 'seconds');
   this.tripMaxAdvancedNotice = moment.duration(5, 'minutes');
   this.removalAge = moment.duration(1, 'minute');
@@ -73,28 +70,43 @@ function Fleet(config) {
   this.expectedDelayWhenNoDriversAvailable = moment.duration(3, 'hours');
   this.nextId = 0;
   this.partner = null;
+  this.tripsId = this.id.toLowerCase() + '@tripthru.com';
   this.queue = [];
   
   this.drivers = {};
-  this.availableDrivers = [];
   this.returningDrivers = [];
-  for(var i = 0; i < config.drivers.length; i++) {
-    this.addDriver({
-      id: config.drivers[i],
-      name: config.drivers[i]
-    });
-  }
 }
 
 Fleet.prototype.setPartner = function(partner) {
   this.partner = partner;
 };
 
-Fleet.prototype.addDriver = function(driver) {
-  driver.fleet = this;
-  driver.location = this.location;
-  this.drivers[driver.id] = driver;
-  this.availableDrivers.push(driver);
+Fleet.prototype.createDriver = function() {
+  if(this.maxDriversReached()) {
+    return null;
+  }
+  var driverName = simulationData.getRandomName() + ' ' + Math.ceil((Math.random()*1000));
+  while(this.drivers.hasOwnProperty(driverName)) {
+    driverName = simulationData.getRandomName() + ' ' + Math.ceil((Math.random()*1000));
+  }
+  var driver = {
+      id: driverName,
+      name: driverName,
+      fleet: this,
+      location: this.location
+  };
+  return this.drivers[driver.id] = driver;
+};
+
+Fleet.prototype.deleteDriver = function(driver) {
+  if(!this.drivers.hasOwnProperty(driver.id)) {
+    throw new Error('Driver doesn\'t exist');
+  }
+  delete this.drivers[driver.id];
+};
+
+Fleet.prototype.maxDriversReached = function() {
+  return Object.keys(this.drivers).length >= this.maxDrivers;
 };
 
 Fleet.prototype.simulate = function() {
@@ -112,7 +124,7 @@ Fleet.prototype.simulate = function() {
 };
 
 Fleet.prototype.generateRandomTrips = function() {
-  if(this.queue.length >= this.maxActiveTrips || this.possibleTrips.length === 0) {
+  if(this.queue.length >= this.maxActiveTrips) {
     return;
   }
   
@@ -136,9 +148,9 @@ Fleet.prototype.generateRandomTrips = function() {
 };
 
 Fleet.prototype.generateRandomTrip = function(now) {
-  var passenger = this.passengers[Math.floor(Math.random()*this.passengers.length)];
+  var passenger = simulationData.getRandomName();
   passenger = {id: passenger, name: passenger};
-  var fromTo = this.possibleTrips[Math.floor(Math.random()*this.possibleTrips.length)];
+  var fromTo = simulationData.getRandomFarmedOutTrip(this.partner.fleets);
   var pickupTime = moment(now).add(this.tripMaxAdvancedNotice);
   var from = new Location(fromTo.start.lat, fromTo.start.lng);
   var to = new Location(fromTo.end.lat, fromTo.end.lng);
@@ -163,11 +175,11 @@ Fleet.prototype.createTrip = function(passenger, pickupTime, from, to, foreignId
 };
 
 Fleet.prototype.queueTrip = function(trip) {
-  if(this.availableDrivers.length === 0 && trip.origination === 'foreign') {
+  if(this.maxDriversReached() && trip.origination === 'foreign') {
     return false;
   }
   if(this.partner.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
-    throw new Error('sim', 'Trip ' + trip.id + ' already exists in active trips');
+    throw new Error('Trip ' + trip.id + ' already exists in active trips');
   }
   logger.log('sim', 'Queueing ' + trip.id);
   this.queue.push(trip);
@@ -285,7 +297,7 @@ Fleet.prototype.tryDispatchLocally = function(trip) {
     logger.log(trip.id, 'Invalid status for dispatch: ' + trip.status);
     throw new Error('Invalid status for dispatch');
   }
-  if(this.availableDrivers.length > 0) {
+  if(!this.maxDriversReached()) {
     this.dispatchToFirstAvailableDriver(trip);
     if(trip.origination === 'local') {
       return this
@@ -304,10 +316,10 @@ Fleet.prototype.servesLocation = function(location) {
 };
 
 Fleet.prototype.dispatchToFirstAvailableDriver = function(trip) {
-  if(this.availableDrivers.length === 0) {
+  if(this.maxDriversReached()) {
     throw new Error('Invalid condition: no available drivers');
   }
-  trip.driver = this.availableDrivers.shift();
+  trip.driver = this.createDriver();
   trip.fleet = this;
   if(!trip.driver) {
     throw new Error('Invalid condition: driver is not defined');
@@ -499,7 +511,7 @@ Fleet.prototype.updateReturningDriversLocation = function() {
       logger.log('sim', 'Driver ' + driver.name + ' has reached the home office');
       driver.route = null;
       driver.routeStartTime = null;
-      this.availableDrivers.push(driver);
+      this.deleteDriver(driver);
       this.returningDrivers.splice(len, 1);
     } else if(this.driverUpdateIntervalReached(driver)) {
       driver.lastUpdate = moment();
@@ -523,7 +535,7 @@ Fleet.prototype.driverUpdateIntervalReached = function(driver) {
 
 Fleet.prototype.generateTripId = function() {
   this.nextId++;
-  return this.generatePrivateId(this.nextId + '@' + this.partner.id);
+  return this.generatePrivateId(this.nextId + '@' + this.tripsId);
 };
 
 Fleet.prototype.generateTripPublicId = function(tripId) {
@@ -549,11 +561,11 @@ Fleet.prototype.getPriceAndDistance = function(trip) {
 Fleet.prototype.getPickupEta = function(trip) {
   var startLocation;
   var delay; 
-  if(this.availableDrivers.length === 0) {
+  if(this.maxDriversReached()) {
     startLocation = this.location;
     delay = this.expectedDelayWhenNoDriversAvailable;
   } else {
-    startLocation = this.availableDrivers[0].location;
+    startLocation = this.location;
     delay = moment.duration(0, 'seconds');
   }
   return maptools
@@ -567,7 +579,7 @@ Fleet.prototype.healthCheck = function() {
   logger.log(this.id, 'Health check: ' +
       'Queue: ' + this.queue.length + 
       ', Active trips: ' + Object.keys(this.partner.activeTripsByPublicId).length +
-      ', Available drivers: ' + this.availableDrivers.length +
+      ', Drivers: ' + Object.keys(this.drivers).length +
       ', Returning drivers: ' + this.returningDrivers.length
   );
 };
