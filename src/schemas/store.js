@@ -90,6 +90,7 @@ var quote = new mongoose.Schema({
 
 var user = new mongoose.Schema({
   id: { type: String, trim: true, required: true },
+  name: { type: String, trim: true, required: true },
   token: { type: String, trim: true, required: true }
 });
 

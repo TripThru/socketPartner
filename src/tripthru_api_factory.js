@@ -48,13 +48,16 @@ function createDispatchRequest(trip, partner) {
   var r = {
       id: trip.publicId,
       clientId: trip.partner.id,
+      originatingFleet: idName(trip.fleet),
       passenger: idName(trip.passenger),
       pickupLocation: apiLocation(trip.pickupLocation),
       pickupTime: getISOStringFromMoment(trip.pickupTime),
       dropoffLocation: apiLocation(trip.dropoffLocation)
   };
   if(trip.vehicleType) r.vehicleType = trip.vehicleType;
-  if(partner) r.partner = idName(partner);
+  if(partner) { 
+    r.partner = idName(partner);
+  }
   return r;
 }
 

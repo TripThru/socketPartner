@@ -21,7 +21,7 @@ Promise.promisifyAll(Quote.prototype);
 var Route = mongoose.model('routes', schemas.route);
 Promise.promisifyAll(Route);
 Promise.promisifyAll(Route.prototype);
-var User = mongoose.model('users', schemas.user);
+var User = mongoose.model('user', schemas.user, 'usernode'); //temporary collection name while migrating website
 Promise.promisifyAll(User);
 Promise.promisifyAll(User.prototype);
 
