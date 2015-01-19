@@ -1,6 +1,6 @@
 module.exports = {
   tripthru: {
-    url: 'http://107.170.220.160/',
+    url: 'http://localhost:3300/',
     token: 'tokenTaxiBeat'
   },
   name: 'TaxiBeat',
