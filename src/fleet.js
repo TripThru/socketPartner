@@ -4,6 +4,7 @@ var logger = require('./logger');
 var moment = require('moment');
 var maptools = require('./map_tools').MapTools;
 var Location = require('./map_tools').Location;
+var MapToolsError = require('./map_tools').MapToolsError;
 var Promise = require('bluebird');
 var PromiseHelper = require('./promise_helper');
 var simulationData = require('./models/simulation_data');
@@ -198,15 +199,20 @@ Fleet.prototype.processQueue = function() {
 };
 
 Fleet.prototype.processTrip = function(trip) {
+  var promise;
   switch(trip.status) {
     case 'queued':
-      return this.processStatusQueued(trip);
+      promise = this.processStatusQueued(trip);
+      break;
     case 'dispatched':
-      return this.processStatusDispatched(trip);
+      promise = this.processStatusDispatched(trip);
+      break;
     case 'enroute':
-      return this.processStatusEnroute(trip);
+      promise = this.processStatusEnroute(trip);
+      break;
     case 'pickedup':
-      return this.processStatusPickedUp(trip);
+      promise = this.processStatusPickedUp(trip);
+      break;
     case 'booking':
       //special case for trips created through booking website dispatched
       //to foreign provider
@@ -218,6 +224,17 @@ Fleet.prototype.processTrip = function(trip) {
     default:
       throw new Error('Unexpected status (' + trip.status + '): ' + trip.id);
   }
+  // Handle promise rejection here to avoid breaking the process trip chain
+  promise
+    .catch(MapToolsError, function(err){
+      logger.log(trip.id, 'MapToolsError: ' + err.message);
+    })
+    .error(function(err){
+      logger.log(trip.id, 'Unknown error: ' + err);
+    })
+    .finally(function(){
+      Promise.resolve();
+    });
 };
 
 Fleet.prototype.processStatusQueued = function(trip) {

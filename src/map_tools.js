@@ -7,8 +7,11 @@ var Promise = require('bluebird');
 var metersToMiles = 0.000621371192;
 var maxDuration = 10;
 
-function MapToolsError(error) {
+function MapToolsError(error, from, to) {
   this.error = error;
+  this.from = from;
+  this.to = to;
+  this.message = this.error + ': <' + this.from + ':' + this.to + '>';
   Error.captureStackTrace(this, MapToolsError);
 }
 MapToolsError.prototype = Object.create(Error.prototype);
@@ -103,12 +106,12 @@ MapTools.prototype.reachedQueryLimit = function() {
 };
 
 MapTools.prototype.setMinuteOverQueryLimit = function() {
-  logger.log('mp', 'Reached google OVER_QUERY_LIMIT, setting 3 second delay before resuming requests');
+  logger.log('debug', 'Reached google OVER_QUERY_LIMIT, setting 3 second delay before resuming requests');
   this.googleQueryLimitEnd = moment().add(3, 'seconds');
 };
 
 MapTools.prototype.setDailyOverQueryLimit = function() {
-  logger.log('mp', 'Reached 2500 google requests, setting 24 hours delay before resuming requests');
+  logger.log('debug', 'Reached 2500 google requests, setting 24 hours delay before resuming requests');
   this.googleQueryLimitEnd = moment().add(1, 'day').add(5, 'minutes');
 };
 
@@ -176,7 +179,7 @@ var makeGoogleRequest = function(instance, from, to) {
           data.status === 'ZERO_RESULTS' || 
           data.status === 'OVER_QUERY_LIMIT') {
         self.logNewRequest(false);
-        reject(new MapToolsError('Reached google query limit'));
+        reject(new MapToolsError('Reached google query limit', from.id, to.id));
         return;
       }
       self.logNewRequest(true);

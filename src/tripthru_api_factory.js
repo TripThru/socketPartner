@@ -1,7 +1,9 @@
 var moment = require('moment');
 var codes = require('./codes');
+var logger = require('./logger');
 var resultCodes = codes.resultCodes;
 var PromiseHelper = require('./promise_helper');
+var MapToolsError = require('./map_tools').MapToolsError;
 
 // This module transforms incoming requests into inner structures known to the 
 // whole simulation, and transforms inner structures into outgoing requests.
@@ -277,11 +279,20 @@ function createQuoteFromTrip(trip) {
           .then(function(priceAndDistance){
             quote.price = priceAndDistance.price;
             quote.distance = priceAndDistance.distance;
+          })
+          .catch(MapToolsError, function(err){
+            logger.log(trip.id, 'MapToolsError: ' + err.message);
           });
       }
     })
     .then(function(){
       return quote;
+    })
+    .catch(MapToolsError, function(err){
+      logger.log(trip.id, 'MapToolsError: ' + err.message);
+    })
+    .finally(function(){
+      return null;
     });
 }
 
@@ -308,8 +319,10 @@ function createUpdateQuoteRequestFromQuoteRequest(request, fleets) {
     .runInSequence(tasks, function(trip){
       return createQuoteFromTrip(trip)
         .then(function(quote){
-          quote.eta = getISOStringFromMoment(quote.eta);
-          quotes.push(quote);
+          if(quote) {
+            quote.eta = getISOStringFromMoment(quote.eta);
+            quotes.push(quote);
+          }
         });
     })
     .then(function(){
