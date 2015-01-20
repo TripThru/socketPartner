@@ -225,16 +225,20 @@ Fleet.prototype.processTrip = function(trip) {
       throw new Error('Unexpected status (' + trip.status + '): ' + trip.id);
   }
   // Handle promise rejection here to avoid breaking the process trip chain
-  promise
-    .catch(MapToolsError, function(err){
-      logger.log(trip.id, 'MapToolsError: ' + err.message);
-    })
-    .error(function(err){
-      logger.log(trip.id, 'Unknown error: ' + err);
-    })
-    .finally(function(){
-      Promise.resolve();
-    });
+  if(promise) {
+    promise
+      .catch(MapToolsError, function(err){
+        logger.log(trip.id, 'MapToolsError: ' + err.message);
+      })
+      .error(function(err){
+        logger.log(trip.id, 'Unknown error: ' + err);
+      })
+      .finally(function(){
+        return Promise.resolve();
+      });
+  } else {
+    return Promise.resolve();
+  }
 };
 
 Fleet.prototype.processStatusQueued = function(trip) {
