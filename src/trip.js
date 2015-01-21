@@ -98,7 +98,7 @@ Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, et
         break;
       case 'rejected':
       case 'cancelled':
-        if(this.origination === 'foreign' ||  this.fleet.missedPeriodReached(this)) {
+        /*if(this.origination === 'foreign' ||  this.fleet.missedPeriodReached(this)) {
           logger.log(this.id, 'Missed period reached or trip is foreign so deactivating');
           this.partner.deactivateTrip(this, status);
           notifyPartner = true;
@@ -106,6 +106,10 @@ Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, et
           logger.log(this.id, 'Missed period not reached yet so putting trip back to queue');
           this.status = 'queued';
           this.service = 'local';
+        }*/
+        if(this.origination === 'foreign') {
+          this.partner.deactivateTrip(this, status);
+          notifyPartner = true;
         }
         break;
     }
