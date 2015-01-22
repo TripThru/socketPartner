@@ -154,11 +154,9 @@ function createGetTripStatusResponse(trip, partner) {
     r.driver = idName(trip.driver);
     if(trip.driver.location) r.driver.location = apiLocation(trip.driver.location);
     if(trip.driver.initialLocation) r.driver.initialLocation = apiLocation(trip.driver.initialLocation);
-    if(trip.driver.route) {
-      r.distance = trip.driver.route.distance;
-      r.driver.routeDuration = trip.driver.route.duration.asSeconds();
-    }
   }
+  if(trip.distance) r.distance = trip.distance;
+  if(trip.duration) r.duration = trip.duration.asSeconds();
   return r;
 }
 

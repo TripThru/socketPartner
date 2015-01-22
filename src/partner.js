@@ -11,6 +11,7 @@ var codes = require('./codes');
 var Promise = require('bluebird');
 var PromiseHelper = require('./promise_helper');
 var resultCodes = codes.resultCodes;
+var moment = require('moment');
 
 function Partner(config) {
   
@@ -43,6 +44,7 @@ function Partner(config) {
   }
   this.preferedPartnerId = config.preferedPartnerId;
   this.activeTripsByPublicId = {};
+  this.tripRemovalDuration = moment.duration(3, 'minute');
 }
 
 Partner.prototype.getPartnerInfo = function(request, cb) {
@@ -250,7 +252,10 @@ Partner.prototype.addTrip = function(trip) {
 
 Partner.prototype.deactivateTrip = function(trip, status) {
   //trips.updateTrip(trip); Fix bug
-  delete this.activeTripsByPublicId[trip.publicId];
+  var self = this;
+  setTimeout(function(){
+    delete self.activeTripsByPublicId[trip.publicId];
+  }, this.tripRemovalDuration.asMilliseconds());
 };
 
 Partner.prototype.updateForeignPartner = function(trip) {

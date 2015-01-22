@@ -388,7 +388,8 @@ Fleet.prototype.makeTripEnroute = function(trip) {
   return this
     .updateDriverRouteAndGetETA(trip, trip.pickupLocation)
     .then(function(eta){
-      return trip.updateStatus(true, 'enroute', trip.driver.location, eta);
+      return trip.updateStatus(true, 'enroute', trip.driver.location, eta, 
+          trip.driver.route.distance, trip.driver.route.duration);
     });
 };
 
@@ -449,7 +450,8 @@ Fleet.prototype.makeTripPickedUp = function(trip) {
   return this
     .updateDriverRouteAndGetETA(trip, trip.dropoffLocation)
     .then(function(eta){
-      return trip.updateStatus(true, 'pickedup', trip.driver.location, eta);
+      return trip.updateStatus(true, 'pickedup', trip.driver.location, eta, 
+          trip.driver.route.distance, trip.driver.route.duration);
     });
 };
 

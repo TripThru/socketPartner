@@ -1,5 +1,6 @@
 var logger = require('./logger');
 var maptools = require('./map_tools').MapTools;
+var moment = require('moment');
 
 function Trip(config) {
   
@@ -40,7 +41,6 @@ function Trip(config) {
   this.persons = null;
   this.pickupLocation = config.pickupLocation;
   this.pickupTime = config.pickupTime;
-  this.duration = config.duration;
   this.dropoffLocation = config.dropoffLocation;
   this.dropoffTime = config.dropoffTime;
   this.waypoints = config.waypoints;
@@ -52,7 +52,8 @@ function Trip(config) {
   this.autoDispatch = config.autoDispatch === false ? false : true;
   this.lastUpdate = null;
   this.eta = null;
-  this.distance = null;
+  this.distance = 0;
+  this.duration = moment.duration(0, 'seconds');
   this.lastStatusNotifiedToPartner = null;
   this.lastDispatchAttempt = null;
 }
@@ -77,7 +78,7 @@ Trip.prototype.statusHasChanged = function(status, driverLocation, eta) {
   return statusChanged;
 };
 
-Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, eta) {
+Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, eta, distanceToNextPoint, durationToNextPoint) {
   if(this.statusHasChanged(status, driverLocation, eta)) {
     logger.log(this.id, 'Status has changed from ' + this.status + ' to ' +
         status + '. Driver location: ' + (driverLocation ? driverLocation.id : ''));
@@ -90,6 +91,12 @@ Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, et
     this.status = status;
     if(driverLocation) {
       this.updateDriverLocation(driverLocation);
+    }
+    if(distanceToNextPoint >= 0) { 
+      this.distance += distanceToNextPoint;
+    }
+    if(durationToNextPoint) {
+      this.duration.add(durationToNextPoint);
     }
     switch(status) {
       case 'complete':
