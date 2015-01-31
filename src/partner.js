@@ -247,11 +247,11 @@ Partner.prototype.tryToDispatchToForeignProvider = function(trip, partnerId) {
 
 Partner.prototype.addTrip = function(trip) {
   this.activeTripsByPublicId[trip.publicId] = trip;
-  trips.createTrip(trip);
+  //trips.createTrip(trip);
 };
 
 Partner.prototype.deactivateTrip = function(trip, status) {
-  //trips.updateTrip(trip); Fix bug
+  //trips.updateTrip(trip);
   var self = this;
   setTimeout(function(){
     delete self.activeTripsByPublicId[trip.publicId];
@@ -284,7 +284,7 @@ Partner.prototype.bookingsQuoteTrip = function(request, cb) {
        }
        return TripThruApiFactory
          .createUpdateQuoteRequestFromQuoteRequest(request, this.fleets)
-         .delay(3000) //wait to receive quote update from tripthru
+         .delay(6000) //wait to receive quote update from tripthru
          .then(function(res){
            quotes
              .getById(quote.id)
