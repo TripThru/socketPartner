@@ -4,8 +4,6 @@ var moment = require('moment');
 var logger = require('./logger');
 var store = require('./models/routes');
 var Promise = require('bluebird');
-var metersToMiles = 0.000621371192;
-var maxDuration = 10;
 
 function MapToolsError(error, from, to) {
   this.error = error;
@@ -60,6 +58,7 @@ function MapTools() {
   this.googleQueryLimitEnd = null;
   this.currentRequestsDay = moment().dayOfYear();
   this.requestsCountToday = 0;
+  this.pendingRouteRequestsById = {};
 }
 
 MapTools.prototype.isInside = function(location, coverage) {
@@ -129,24 +128,32 @@ MapTools.prototype.logNewRequest = function(wasSuccessful) {
 MapTools.prototype.getRoute = function(from, to) {
   from = new Location(from.lat, from.lng);
   to = new Location(to.lat, to.lng);
-  var self = this;
+  var maptools = this;
   
   return store
     .getRouteById(Route.getKey(from, to))
     .then(function(route){
       if(route) {
         return Promise.resolve(routeFromStoreResult(route));
-      } else {
-        return makeGoogleRequest(self, from, to)
-          .bind({})
-          .then(function(route){
-            this.route = route;
-            return store.createRoute(route);
-          })
-          .then(function(){
-            return this.route;
-          });
       }
+      var requestId = from.id + to.id; 
+      if(!maptools.pendingRouteRequestsById.hasOwnProperty(requestId)) {
+        if(maptools.reachedQueryLimit()) {
+          return Promise.reject(new MapToolsError('Reached query limit', from.id, to.id));
+        }
+        maptools.pendingRouteRequestsById[requestId] = 
+          makeGoogleRequest(maptools, from, to)
+            .bind({})
+            .then(function(route){
+              this.route = route;
+              return store.createRoute(route);
+            })
+            .then(function(){
+              delete maptools.pendingRouteRequestsById[requestId];
+              return this.route;
+            });
+      }
+      return maptools.pendingRouteRequestsById[requestId];
     });
 };
 
@@ -161,6 +168,10 @@ var routeFromStoreResult = function(storeResult) {
   return new Route(waypoints);
 };
 
+
+var maxStepDuration = moment.duration(3, 'seconds');
+var maxStepLatLng = 0.0005;
+var metersToMiles = 0.000621371192;
 var makeGoogleRequest = function(instance, from, to) {
   var self = instance;
   return new Promise(function(resolve, reject){
@@ -188,6 +199,7 @@ var makeGoogleRequest = function(instance, from, to) {
       waypoints.push(new Waypoint(from, moment.duration(0, 'seconds'), 0));
       var totalDistance = 0;
       var elapse = 0;
+      var initialDelay = null;
       for(var i = 0; i < data.routes[0].legs.length; i++) {
         var leg = data.routes[0].legs[i];
         for(var j = 0; j < leg.steps.length; j++) {
@@ -198,24 +210,52 @@ var makeGoogleRequest = function(instance, from, to) {
           var tempTotalDistance = totalDistance;
           totalDistance += distance;
           var tempElapse = elapse;
-          elapse += duration;
+          var stepDuration = 0;
           
-          if(duration > maxDuration) {
+          if(duration > maxStepDuration.asSeconds()) {
+            var exceedsMaxDuration = true;
+            var tempMaxLatLng = maxStepLatLng;
             var locations = decodePolylinePoints(step.polyline.points);
-            var granulatedWaypoints = 
-              increaseWaypointLocations(locations, duration, tempElapse, 
-                  distance, tempTotalDistance);
-              Array.prototype.push.apply(waypoints, granulatedWaypoints);
+            var granulatedWaypoints = [];
+            var attemps = 0;
+            var calculatedElapse;
+            while(exceedsMaxDuration && attemps < 2) {
+              exceedsMaxDuration = false;
+              var result = 
+                increaseWaypointLocations(locations, duration, tempElapse, 
+                    distance, tempTotalDistance, tempMaxLatLng);
+              granulatedWaypoints = result.waypoints;
+              calculatedElapse = result.elapse;
+              for(var w = 0; w < granulatedWaypoints.length; w++) {
+                stepDuration = granulatedWaypoints[w].stepDuration;
+                if(stepDuration > maxStepDuration.asSeconds()) {
+                  tempMaxLatLng = tempMaxLatLng / 3;
+                  exceedsMaxDuration = true;
+                  break;
+                }
+              }
+              attemps++;
+            }
+            elapse += calculatedElapse;
+            Array.prototype.push.apply(waypoints, granulatedWaypoints);
           } else {
+            elapse += duration;
+            stepDuration = duration;
             waypoints.push(new Waypoint(end, moment.duration(elapse, 'seconds'),
                 totalDistance)
             );
+          }
+          if(!initialDelay) {
+            initialDelay = moment.duration(stepDuration, 'seconds');
           }
         }
       }
       waypoints.push(new Waypoint(to, moment.duration(elapse, 'seconds'), 
           totalDistance)
       );
+      for(var i = 1; i < waypoints.length; i++) {
+        waypoints[i].elapse = waypoints[i].elapse.subtract(initialDelay);
+      }
       var route = new Route(waypoints);
       resolve(route);
     });
@@ -223,26 +263,23 @@ var makeGoogleRequest = function(instance, from, to) {
 };
 
 var increaseWaypointLocations = function(locations, duration, totalDuration, 
-    distance, totalDistance) {
-  
-  var maxStepLatLng = 0.0005;
+    distance, totalDistance, maxLatLng) {
   var waypoints = [];
   var countDuration = totalDuration;
   var countDistance = totalDistance;
   var stepDuration = duration / locations.length;
   var stepDistance = distance / locations.length;
   var tempLocation = null;
+  var thisWaypointsDuration = 0;
   
   for(var i = 0; i < locations.length; i++) {
     var location = locations[i];
     if(!tempLocation) {
       tempLocation = location;
-      countDuration = stepDuration;
-      countDistance = stepDistance;
       continue;
     }
     var tempLocations = 
-      increaseGranularityDistance(tempLocation, location, maxStepLatLng);
+      increaseGranularityDistance(tempLocation, location, maxLatLng);
     var stepDurationTemp = stepDuration / tempLocations.length;
     var stepDistanceTemp = stepDistance / tempLocations.length;
     var countDurationTemp = countDuration;
@@ -251,16 +288,19 @@ var increaseWaypointLocations = function(locations, duration, totalDuration,
       var tempLoc = tempLocations[j];
       countDurationTemp += stepDurationTemp;
       countDistanceTemp += stepDistanceTemp;
-      waypoints.push(
-          new Waypoint(tempLoc, moment.duration(countDurationTemp , 'seconds'), 
-              countDistanceTemp)
-          );
+      var w = new Waypoint(tempLoc, moment.duration(countDurationTemp , 'seconds'), 
+          countDistanceTemp);
+      w.stepDuration = stepDurationTemp;
+      waypoints.push(w);
     }
-    countDuration += stepDuration;
-    countDistance += stepDistance;
+    if(tempLocations.length > 0) {
+      countDuration += stepDuration;
+      countDistance += stepDistance;
+      thisWaypointsDuration += stepDuration;
+    }
     tempLocation = location;
   }
-  return waypoints;
+  return { waypoints: waypoints, elapse: thisWaypointsDuration };
 };
 
 var increaseGranularityDistance = function(from, to, maxLatLng) {

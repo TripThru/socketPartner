@@ -378,7 +378,10 @@ Fleet.prototype.driverWillBeLateIfHeDoesntLeaveNow = function(trip) {
   return maptools
     .getRoute(trip.driver.location, trip.pickupLocation)
     .then(function(route){
-      var m = moment(trip.pickupTime).subtract(route.duration);
+      var minutesToLeave = Math.floor(Math.random() * 4);
+      var m = moment(trip.pickupTime)
+                .subtract(route.duration)
+                .subtract(moment.duration(minutesToLeave, 'minute'));
       return moment().isAfter(m);
     });
 };
@@ -529,22 +532,26 @@ Fleet.prototype.updateReturningDriversLocation = function() {
   var len = this.returningDrivers.length;
   while(--len >= 0) {
     var driver = this.returningDrivers[len];
-    this.updateDriverReturningLocation(driver);
-    if(this.driverHomeOfficeReached(driver)) {
-      logger.log('sim', 'Driver ' + driver.name + ' has reached the home office');
-      driver.route = null;
-      driver.routeStartTime = null;
-      this.deleteDriver(driver);
-      this.returningDrivers.splice(len, 1);
-    } else if(this.driverUpdateIntervalReached(driver)) {
-      driver.lastUpdate = moment();
-      logger.log(driver.name, 'Update ' + driver.location.id);
+    if(driver) {
+      this.updateDriverReturningLocation(driver);
+      if(this.driverHomeOfficeReached(driver)) {
+        logger.log('sim', 'Driver ' + driver.name + ' has reached the home office');
+        driver.route = null;
+        driver.routeStartTime = null;
+        this.deleteDriver(driver);
+        this.returningDrivers.splice(len, 1);
+      } else if(this.driverUpdateIntervalReached(driver)) {
+        driver.lastUpdate = moment();
+        logger.log(driver.name, 'Update ' + driver.location.id);
+      }
     }
   }
 };
 
 Fleet.prototype.updateDriverReturningLocation = function(driver) {
-  driver.location = driver.route.getCurrentWaypoint(driver.routeStartTime, moment());
+  if(driver && driver.route) {
+    driver.location = driver.route.getCurrentWaypoint(driver.routeStartTime, moment());
+  }
 };
 
 Fleet.prototype.driverHomeOfficeReached = function(driver) {
