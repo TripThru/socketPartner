@@ -1,12 +1,11 @@
 module.exports = {
   tripthru: {
-    url: 'http://localhost:3300/',
-    token: 'tokenFlyWheel'
+    token: 'fHzevcrSopGPkdIvrIIpvXFruuKLwZzqApzTWXFPtXZcAUhrSS'
   },
   name: 'FlyWheel',
   clientId: 'flywheel@tripthru.com',
   simulationInterval: 10,
-  tripsPerHour: 125,
+  tripsPerHour: 250,
   drivers: 7000,
   coverage: [
        {city: 'Chicago', businessPercentage: 25},

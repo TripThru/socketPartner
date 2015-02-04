@@ -9,6 +9,7 @@ var fs = require('fs');
 var GatewayClient = require('./src/gateway_client');
 var PartnerFactory = require('./src/partner_factory');
 var configDirectory = './partner_config/';
+var globalConfig = require('./config');
 
 function start(partner, interval) {
   partner
@@ -27,6 +28,7 @@ var started = {};
 
 function runOnePartner(name) {
   var config = require(configDirectory + name);
+  config.tripthru.url = globalConfig.tripthru.url;
   logger.log('init', 'Loading configuration ' + name);
   var simulationInterval = config.simulationInterval*1000;
   var client = new GatewayClient('client' + config.name, 'client' + config.name, 

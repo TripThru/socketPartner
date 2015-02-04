@@ -1,12 +1,11 @@
 module.exports = {
   tripthru: {
-    url: 'http://localhost:3300/',
-    token: 'tokenEasyTaxi'
+    token: 'RznyBXlaWotGebEcBbSpjPnhVGNuUEjYpDnJKpatroZOsgtCxV'
   },
   name: 'EasyTaxi',
   clientId: 'easytaxi@tripthru.com',
   simulationInterval: 10,
-  tripsPerHour: 420,
+  tripsPerHour: 700,
   drivers: 18500,
   coverage: [
      { city: 'Buenos Aires', businessPercentage: 5 },

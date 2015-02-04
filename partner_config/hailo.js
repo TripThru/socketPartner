@@ -1,12 +1,11 @@
 module.exports = {
   tripthru: {
-    url: 'http://localhost:3300/',
-    token: 'tokenHailo'
+    token: 'uquqcKfKoHlNODtmseeriHhirXjelZPthSAzNApbrNxsQFvMEL'
   },
   name: 'Hailo',
   clientId: 'hailo@tripthru.com',
   simulationInterval: 10,
-  tripsPerHour: 210,
+  tripsPerHour: 400,
   drivers: 10000,
   coverage: [
      { city: 'London', businessPercentage: 32 },

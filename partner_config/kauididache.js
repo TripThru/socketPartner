@@ -1,12 +1,11 @@
 module.exports = {
   tripthru: {
-    url: 'http://localhost:3300/',
-    token: 'tokenKauidiDache'
+    token: 'FgknqXheOAYMweMTZdoUURsqtaQHUqffvETsQtpctRsaYABBjD'
   },
   name: 'KauidiDache',
   clientId: 'kauididache@tripthru.com',
   simulationInterval: 10,
-  tripsPerHour: 20800,
+  tripsPerHour: 1500,
   drivers: 90000,
   coverage: [
        {city: 'Peking', businessPercentage: 97},

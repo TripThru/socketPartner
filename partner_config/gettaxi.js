@@ -1,12 +1,11 @@
 module.exports = {
   tripthru: {
-    url: 'http://localhost:3300/',
-    token: 'tokenGetTaxi'
+    token: 'kMQORyNoyAiUiRvKjULkdctPnChTOXbvZRnffDCWecCBLKhDIY'
   },
   name: 'GetTaxi',
   clientId: 'gettaxi@tripthru.com',
   simulationInterval: 10,
-  tripsPerHour: 250,
+  tripsPerHour: 500,
   drivers: 7000,
   coverage: [
        {city: 'Vienna', businessPercentage: 2},

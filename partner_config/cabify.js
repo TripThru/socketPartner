@@ -1,12 +1,11 @@
 module.exports = {
   tripthru: {
-    url: 'http://localhost:3300/',
-    token: 'tokenCabify'
+    token: 'CjVxGcwiQWzJtmdYhfjUJrzERtxkvpelAEYSiZXKyCZZhGcwHw'
   },
   name: 'Cabify',
   clientId: 'cabify@tripthru.com',
   simulationInterval: 10,
-  tripsPerHour: 100,
+  tripsPerHour: 400,
   drivers: 2000,
   coverage: [
        {city: 'Santiago', businessPercentage: 19},
