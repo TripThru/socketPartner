@@ -2,7 +2,7 @@ module.exports = {
   tripthru: {
     token: 'JizjGuEQqcjNYMstecnylUzWTHRXxTZCOyLPAjSEDKxlclvlQb'
   },
-  name: 'myTaxi',
+  name: 'MyTaxi',
   clientId: 'mytaxi@tripthru.com',
   simulationInterval: 10,
   tripsPerHour: 700,
