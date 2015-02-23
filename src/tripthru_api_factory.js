@@ -162,25 +162,17 @@ function createGetTripStatusResponse(trip, partner) {
 
 function createGetPartnerInfoResponse(fleets) {
   var response = {
-      coverage: [],
-      fleets: [],
-      vehicleTypes: []
+      fleets: []
   };
   var vehicleTypesTemp = {};
   for(var i = 0; i < fleets.length; i++) {
-    var fleet = fleets[i];
-    response.fleets.push(idName(fleet));
-    response.coverage.push({
-        center: apiLocation(fleet.coverage.center),
-        radius: fleet.coverage.radius
-    });
-    for(var j = 0; j < fleet.vehicleTypes.length; j++) {
-      var type = fleet.vehicleTypes[j];
-      if(!vehicleTypesTemp.hasOwnProperty(type)) {
-        vehicleTypesTemp[type] = type;
-        response.vehicleTypes.push(type);
-      }
-    }
+    var fleet = idName(fleets[i]);
+    fleet.coverage = {
+        center: apiLocation(fleets[i].coverage.center),
+        radius: fleets[i].coverage.radius
+    };
+    fleet.vehicleTypes = fleets[i].vehicleTypes;
+    response.fleets.push(fleet);
   }
   return response;
 }
