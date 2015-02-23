@@ -42,7 +42,7 @@ function init(partnersById) {
           res.json(response);
         });
       });
-    })(id)
+    })(id);
   }
   
   app.listen(app.get('port'), function (){
