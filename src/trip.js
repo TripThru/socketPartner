@@ -101,6 +101,12 @@ Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, et
     switch(status) {
       case 'complete':
         logger.log(this.id, 'Trip completed, deactivating');
+        this.fleet
+          .getPriceAndDistance(this)
+          .bind(this)
+          .then(function(result){
+            this.price = result.price;
+          });
         this.partner.deactivateTrip(this, status);
         break;
       case 'rejected':
