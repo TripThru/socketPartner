@@ -79,12 +79,13 @@ Trip.prototype.statusHasChanged = function(status, driverLocation, eta) {
 };
 
 Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, eta, distanceToNextPoint, durationToNextPoint) {
+  var promiseToUpdate = Promise.resolve();
   if(this.statusHasChanged(status, driverLocation, eta)) {
     logger.log(this.id, 'Status has changed from ' + this.status + ' to ' +
         status + '. Driver location: ' + (driverLocation ? driverLocation.id : ''));
     if(!this.isActive()) {
       logger.log(this.id, 'Cannot set status: trip is not active');
-      return Promise.resolve();
+      return promiseToUpdate;
     }
 
     this.eta = eta || this.eta;
@@ -101,12 +102,19 @@ Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, et
     switch(status) {
       case 'complete':
         logger.log(this.id, 'Trip completed, deactivating');
-        this.fleet
-          .getPriceAndDistance(this)
-          .bind(this)
-          .then(function(result){
-            this.price = result.price;
-          });
+        promiseToUpdate = 
+          promiseToUpdate
+            .bind(this)
+            .then(function(){
+              return this
+                .fleet
+                .getPriceAndDistance(this)
+                .bind(this)
+                .then(function(result){
+                  this.price = result.price;
+                });
+            });
+          
         this.partner.deactivateTrip(this, status);
         break;
       case 'rejected':
@@ -127,15 +135,20 @@ Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, et
         break;
     }
     if(this.lastStatusNotifiedToPartner !== status && notifyPartner) {
-      return this
-        .notifyForeignPartner()
-        .bind(this)
-        .then(function(){
-          this.lastStatusNotifiedToPartner = status;
-        });
+      promiseToUpdate = 
+        promiseToUpdate
+          .bind(this)
+          .then(function(){
+            return this
+              .notifyForeignPartner()
+              .bind(this)
+              .then(function(){
+                this.lastStatusNotifiedToPartner = status;
+              });
+          });
     }
-    return Promise.resolve();
   }
+  return promiseToUpdate;
 };
 
 Trip.prototype.updateDriverLocation = function(location) {

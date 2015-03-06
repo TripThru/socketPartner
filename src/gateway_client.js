@@ -29,6 +29,12 @@ GatewayClient.prototype.setListener = function(listener) {
   this.socket.on('update-trip-status', function(req, cb){
     this.listener.updateTripStatus(req, cb);
   }.bind(this));
+  this.socket.on('request-payment', function(req, cb){
+    this.listener.requestPayment(req, cb);
+  }.bind(this));
+  this.socket.on('accept-payment', function(req, cb){
+    this.listener.acceptPayment(req, cb);
+  }.bind(this));
   
   //Quotes
   this.socket.on('quote-trip', function(req, cb){
@@ -106,6 +112,14 @@ GatewayClient.prototype.getTripStatus = function(request) {
 
 GatewayClient.prototype.updateTripStatus = function(request) {
   return this.emit('update-trip-status', request);
+};
+
+GatewayClient.prototype.requestPayment = function(request) {
+  return this.emit('request-payment', request);
+};
+
+GatewayClient.prototype.acceptPayment = function(request) {
+  return this.emit('accept-payment', request);
 };
 
 GatewayClient.prototype.quoteTrip = function(request) {

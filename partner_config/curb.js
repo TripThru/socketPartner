@@ -1,6 +1,6 @@
 module.exports = {
   tripthru: {
-    token: 'enGuxPJhrhAJznDRqOyWldIqCrVEJhLXNubmdcxUltSijrlZfA'
+    token: 'VRggGsLlmyXWWmUiYHUOZJNlevbuudjVNvzKCQmKbOsiWjbnmp'
   },
   name: 'Curb',
   clientId: 'curb@tripthru.com',

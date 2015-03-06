@@ -168,6 +168,43 @@ Partner.prototype.getTrip = function(request, cb) {
   throw new Error('Not implemented');
 };
 
+Partner.prototype.requestPayment = function(request, cb) {
+  logger.log(request.id, this.id + ' received payment request');
+  
+  var trip = 
+    TripThruApiFactory.createTripFromTripPaymentRequest(request, 'request-payment');
+  if(!this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
+    cb(TripThruApiFactory.createResponseFromTrip(null, null, 
+        'Not found', resultCodes.notFound));
+    return;
+  }
+  var response = 
+    TripThruApiFactory.createResponseFromTripPaymentRequest(request, 'request-payment');
+  cb(response);
+  
+  setTimeout(function(){
+    logger.log(request.id, this.id + ' accepting payment request');
+    var acceptPaymentRequest = 
+      TripThruApiFactory.createTripPaymentRequestFromTrip(trip, 'accept-payment');
+    this.gatewayClient.acceptPayment(acceptPaymentRequest);
+  }.bind(this), 1000);
+};
+
+Partner.prototype.acceptPayment = function(request, cb) {
+  logger.log(request.id, this.id + ' received accept payment request');
+  
+  var trip = 
+    TripThruApiFactory.createTripFromTripPaymentRequest(request, 'accept-payment');
+  if(!this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
+    cb(TripThruApiFactory.createResponseFromTrip(null, null, 
+        'Not found', resultCodes.notFound));
+    return;
+  }
+  var response = 
+    TripThruApiFactory.createResponseFromTripPaymentRequest(request, 'accept-payment');
+  cb(response);
+};
+
 Partner.prototype.quoteTrip = function(request, cb) {
   logger.log(request.id, this.id + ' received quotetrip');
   cb(TripThruApiFactory.createResponseFromQuoteRequest(request));
@@ -243,6 +280,12 @@ Partner.prototype.tryToDispatchToForeignProvider = function(trip, partnerId) {
       }
       return success;
     });
+};
+
+Partner.prototype.sendPaymentRequestToTripThru = function(trip) {
+  var paymentRequest = 
+    TripThruApiFactory.createTripPaymentRequestFromTrip(trip, 'request-payment');
+  this.gatewayClient.requestPayment(paymentRequest);
 };
 
 Partner.prototype.addTrip = function(trip) {

@@ -17,9 +17,7 @@
     "mongoose": "*",
     "socket.io-client": "*",
     "polyline": "*",
-    "request": "*",
-    "memwatch": "*",
-    "webkit-devtools-agent" : "*"
+    "request": "*"
   },
   "devDependencies": {
     "blanket": "*",

@@ -1,6 +1,6 @@
 module.exports = {
   tripthru: {
-    token: 'FwVcVRFHdrbOWFbftxbsdbmAUftJQFjUdyocwQgFyspDCdkYWf'
+    token: 'cbscKarVvyIikysRGdSdqfHEneIjtydPhMHhPgMVkujPECfqYf'
   },
   name: 'TaxiPixi',
   clientId: 'taxipixi@tripthru.com',

@@ -1,6 +1,6 @@
 module.exports = {
   tripthru: {
-    token: 'lyAOZclAsQHVVKHtPotsJowkqbXZVvhaPHKzfLBcCHGzuiwCaA'
+    token: 'loGvUopbflybTDhEoiNiVbBBRMNToNPHJJSKjjpTGzrfSMQAZD'
   },
   name: 'GrabTaxi',
   clientId: 'grabtaxi@tripthru.com',

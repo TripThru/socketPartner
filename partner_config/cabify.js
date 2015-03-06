@@ -1,6 +1,6 @@
 module.exports = {
   tripthru: {
-    token: 'CjVxGcwiQWzJtmdYhfjUJrzERtxkvpelAEYSiZXKyCZZhGcwHw'
+    token: 'PyrNjMjuDxDvgCtwshGgvfzjJIiNotdRdxyoKhZGMusIMAMwKT'
   },
   name: 'Cabify',
   clientId: 'cabify@tripthru.com',

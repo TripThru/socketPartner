@@ -1,6 +1,6 @@
 module.exports = {
   tripthru: {
-    token: 'fHzevcrSopGPkdIvrIIpvXFruuKLwZzqApzTWXFPtXZcAUhrSS'
+    token: 'ikxMKOugDCOlOShWuXePxdRFIpfUpBWNoPSMHGbsVMTRADBdpD'
   },
   name: 'FlyWheel',
   clientId: 'flywheel@tripthru.com',

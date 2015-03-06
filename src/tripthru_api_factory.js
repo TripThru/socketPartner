@@ -39,11 +39,11 @@ function apiLocation(location) {
 }
 
 function getISOStringFromMoment(moment) {
-  return moment.utc().toDate().toISOString();
+  return moment.utc().format().toString();
 }
 
 function getMomentFromISOString(dateString) {
-  return moment(dateString, moment.ISO_8601, true);
+  return moment.utc(dateString, moment.ISO_8601, true);
 }
 
 function createDispatchRequest(trip, partner) {
@@ -251,6 +251,76 @@ function createTripFromQuoteRequest(request, fleet) {
     driver: request.driver
   };
   return trip;
+}
+
+function createPaymentRequestFromTrip(trip) {
+  return {
+    id: trip.publicId,
+    currencyCode: 'USD',
+    fare: trip.price
+  };
+}
+
+function createAcceptPaymentRequestFromTrip(trip) {
+  return {
+    id: trip.publicId,
+    tip: 1,
+    confirmation: true
+  };
+}
+
+function createPaymentRequestResponseFromPaymentRequest(request) {
+  return successResponse();
+}
+
+function createAcceptPaymentResponseFromAcceptPaymentRequest(request) {
+  return successResponse();
+}
+
+function createTripFromRequestPaymentRequest(request) {
+  return {
+    publicId: request.id,
+    price: request.fare
+  };
+}
+
+function createTripFromAcceptPaymentRequest(request) {
+  return {
+    publicId: request.id
+  };
+}
+
+function createTripPaymentRequestFromTrip(trip, type) {
+  switch(type) {
+    case 'request-payment':
+      return createPaymentRequestFromTrip(trip);
+    case 'accept-payment':
+      return createAcceptPaymentRequestFromTrip(trip);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
+}
+
+function createResponseFromTripPaymentRequest(request, type) {
+  switch(type) {
+    case 'request-payment':
+      return createPaymentRequestResponseFromPaymentRequest(request);
+    case 'accept-payment':
+      return createAcceptPaymentResponseFromAcceptPaymentRequest(request);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
+}
+
+function createTripFromTripPaymentRequest(request, type) {
+  switch(type) {
+    case 'request-payment':
+      return createTripFromRequestPaymentRequest(request);
+    case 'accept-payment':
+      return createTripFromAcceptPaymentRequest(request);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
 }
 
 function createQuoteFromTrip(trip) {
@@ -465,3 +535,6 @@ module.exports.createUpdateQuoteRequestFromQuoteRequest = createUpdateQuoteReque
 module.exports.createRequestFromQuote = createRequestFromQuote;
 module.exports.createResponseFromQuote = createResponseFromQuote;
 module.exports.createQuoteFromRequest = createQuoteFromRequest;
+module.exports.createTripPaymentRequestFromTrip = createTripPaymentRequestFromTrip;
+module.exports.createResponseFromTripPaymentRequest = createResponseFromTripPaymentRequest;
+module.exports.createTripFromTripPaymentRequest = createTripFromTripPaymentRequest

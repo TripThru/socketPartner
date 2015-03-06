@@ -484,6 +484,7 @@ Fleet.prototype.makeTripComplete = function(trip) {
     .bind(this)
     .then(function(){
       this.completeTrip(trip);
+      this.partner.sendPaymentRequestToTripThru(trip);
     });
 };
 

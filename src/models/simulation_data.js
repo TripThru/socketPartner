@@ -15,7 +15,8 @@ function getCity(name) {
 }
 
 function getRandomName() {
-  return names[Math.floor(Math.random()*names.length)];
+  var name = names[Math.floor(Math.random()*names.length)].split(' ');
+  return name[0];
 }
 
 function getRandomFarmedOutTrip(partnerFleets) {
