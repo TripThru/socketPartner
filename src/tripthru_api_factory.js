@@ -46,19 +46,19 @@ function getMomentFromISOString(dateString) {
   return moment.utc(dateString, moment.ISO_8601, true);
 }
 
-function createDispatchRequest(trip, partner) {
+function createDispatchRequest(trip, network) {
   var r = {
       id: trip.publicId,
-      clientId: trip.partner.id,
-      originatingFleet: idName(trip.fleet),
+      clientId: trip.network.id,
+      originatingProduct: idName(trip.product),
       passenger: idName(trip.passenger),
       pickupLocation: apiLocation(trip.pickupLocation),
       pickupTime: getISOStringFromMoment(trip.pickupTime),
       dropoffLocation: apiLocation(trip.dropoffLocation)
   };
   if(trip.vehicleType) r.vehicleType = trip.vehicleType;
-  if(partner) { 
-    r.partner = idName(partner);
+  if(network) { 
+    r.network = idName(network);
   }
   return r;
 }
@@ -66,7 +66,7 @@ function createDispatchRequest(trip, partner) {
 function createUpdateTripStatusRequest(trip) {
   var r = {
       id: trip.publicId,
-      clientId: trip.partner.id,
+      clientId: trip.network.id,
       status: trip.status
   };
   if(trip.eta) r.eta = getISOStringFromMoment(trip.eta);
@@ -80,7 +80,7 @@ function createUpdateTripStatusRequest(trip) {
 function createGetTripStatusRequest(trip) {
   var r = {
       id: trip.publicId,
-      clientId: trip.partner.id,
+      clientId: trip.network.id,
   };
   return r;
 }
@@ -93,10 +93,10 @@ function createTripFromDispatchRequest(request) {
       pickupTime: getMomentFromISOString(request.pickupTime),
       dropoffLocation: request.dropoffLocation,
   };
-  if(request.fleet) trip.fleet = request.fleet;
+  if(request.product) trip.product = request.product;
   if(request.driver) trip.driver = request.driver;
   if(request.vehicleType) trip.vehicleType = request.vehicleType;
-  if(request.partner) trip.partner = request.partner;
+  if(request.network) trip.network = request.network;
   return trip;
 }
 
@@ -130,9 +130,9 @@ function createUpdateTripStatusResponse(trip) {
   return successResponse();
 }
 
-function createGetTripStatusResponse(trip, partner) {
+function createGetTripStatusResponse(trip, network) {
   var r = successResponse();
-  r.fleet = idName(trip.fleet);
+  r.product = idName(trip.product);
   r.passenger = idName(trip.passenger);
   r.pickupLocation = apiLocation(trip.pickupLocation);
   r.dropoffLocation = apiLocation(trip.dropoffLocation);
@@ -142,13 +142,13 @@ function createGetTripStatusResponse(trip, partner) {
   if(trip.pickupTime) r.pickupTime = getISOStringFromMoment(trip.pickupTime);
   if(trip.eta) r.eta = getISOStringFromMoment(trip.eta);
   if(trip.origination === 'local') {
-    r.originatingPartner = idName({id: partner.id, name: partner.name});
-    r.servicingPartner = idName({id: trip.partner.id, name: trip.partner.name});
+    r.originatingNetwork = idName({id: network.id, name: network.name});
+    r.servicingNetwork = idName({id: trip.network.id, name: trip.network.name});
   } else {
-    r.originatingPartner = idName({id: trip.partner.id, name: trip.partner.name});
-    r.servicingPartner = idName({id: partner.id, name: partner.name});
+    r.originatingNetwork = idName({id: trip.network.id, name: trip.network.name});
+    r.servicingNetwork = idName({id: network.id, name: network.name});
   }
-  if(trip.origination === 'foreign') r.servicingPartner = idName({id: trip.partner.id});
+  if(trip.origination === 'foreign') r.servicingNetwork = idName({id: trip.network.id});
   if(trip.price) r.price = trip.price;
   if(trip.driver) {
     r.driver = idName(trip.driver);
@@ -160,19 +160,19 @@ function createGetTripStatusResponse(trip, partner) {
   return r;
 }
 
-function createGetPartnerInfoResponse(fleets) {
+function createGetNetworkInfoResponse(products) {
   var response = {
-      fleets: []
+      products: []
   };
   var vehicleTypesTemp = {};
-  for(var i = 0; i < fleets.length; i++) {
-    var fleet = idName(fleets[i]);
-    fleet.coverage = {
-        center: apiLocation(fleets[i].coverage.center),
-        radius: fleets[i].coverage.radius
+  for(var i = 0; i < products.length; i++) {
+    var product = idName(products[i]);
+    product.coverage = {
+        center: apiLocation(products[i].coverage.center),
+        radius: products[i].coverage.radius
     };
-    fleet.vehicleTypes = fleets[i].vehicleTypes;
-    response.fleets.push(fleet);
+    product.vehicleTypes = products[i].vehicleTypes;
+    response.products.push(product);
   }
   return response;
 }
@@ -180,11 +180,11 @@ function createGetPartnerInfoResponse(fleets) {
 function createRequestFromTrip(trip, type, args) {
   switch(type) {
     case 'dispatch':
-      var partner;
-      if(args && args.partner && args.partner.id && args.partner.name) {
-        partner = args.partner;
+      var network;
+      if(args && args.network && args.network.id && args.network.name) {
+        network = args.network;
       }
-      return createDispatchRequest(trip, partner);
+      return createDispatchRequest(trip, network);
     case 'update-trip-status':
       return createUpdateTripStatusRequest(trip);
     case 'get-trip-status':
@@ -204,13 +204,13 @@ function createResponseFromTrip(trip, type, message, errorCode, args) {
     case 'update-trip-status':
       return createUpdateTripStatusResponse(trip);
     case 'get-trip-status':
-      var partner;
-      if(args && args.partner && args.partner.id && args.partner.name) {
-        partner = args.partner;
+      var network;
+      if(args && args.network && args.network.id && args.network.name) {
+        network = args.network;
       } else {
-        throw new Error('Partner arg is required');
+        throw new Error('Network arg is required');
       }
-      return createGetTripStatusResponse(trip, partner);
+      return createGetTripStatusResponse(trip, network);
     default:
       throw new Error('Invalid request type ' + type);
   }
@@ -229,13 +229,13 @@ function createTripFromRequest(trip, type) {
   }
 }
 
-function createResponseFromQuoteRequest(request, fleets) {
+function createResponseFromQuoteRequest(request, products) {
   return {
     result: resultCodes.ok
   };
 }
 
-function createTripFromQuoteRequest(request, fleet) {
+function createTripFromQuoteRequest(request, product) {
   var trip = {
     id: request.id,
     pickupLocation: request.pickupLocation,
@@ -246,8 +246,8 @@ function createTripFromQuoteRequest(request, fleet) {
     vehicleType: request.vehicleType,
     maxPrice: request.maxPrice,
     minRating: request.minRating,
-    fleet: fleet,
-    partner: fleet.partner,
+    product: product,
+    network: product.network,
     driver: request.driver
   };
   return trip;
@@ -325,16 +325,16 @@ function createTripFromTripPaymentRequest(request, type) {
 
 function createQuoteFromTrip(trip) {
   var quote = {
-      partner: idName(trip.partner),
-      fleet: idName(trip.fleet),
+      network: idName(trip.network),
+      product: idName(trip.product),
       vehicleType: trip.vehicleType
   };
-  return trip.fleet
+  return trip.product
     .getPickupEta(trip)
     .then(function(eta){
       quote.eta = eta;
       if(trip.dropoffLocation) {
-        return trip.fleet
+        return trip.product
           .getPriceAndDistance(trip)
           .then(function(priceAndDistance){
             quote.price = priceAndDistance.price;
@@ -356,18 +356,18 @@ function createQuoteFromTrip(trip) {
     });
 }
 
-function createUpdateQuoteRequestFromQuoteRequest(request, fleets) {
+function createUpdateQuoteRequestFromQuoteRequest(request, products) {
   var quotes = [];
   var tasks = [];
-  for(var i = 0; i < fleets.length; i++) {
-    var fleet = fleets[i];
-    if(!fleet.servesLocation(request.pickupLocation)) {
+  for(var i = 0; i < products.length; i++) {
+    var product = products[i];
+    if(!product.servesLocation(request.pickupLocation)) {
       continue;
     }
-    for(var j = 0; j < fleet.vehicleTypes.length; j++) {
-      var vehicleType = fleet.vehicleTypes[j];
+    for(var j = 0; j < product.vehicleTypes.length; j++) {
+      var vehicleType = product.vehicleTypes[j];
       if(!request.vehicleType || request.vehicleType === vehicleType) {
-        var trip = createTripFromQuoteRequest(request, fleet);
+        var trip = createTripFromQuoteRequest(request, product);
         trip.vehicleType = vehicleType;
         tasks.push(trip);
       }
@@ -416,8 +416,8 @@ function createQuoteFromUpdateQuoteRequest(request, quote) {
     for(var i = 0; i < request.quotes.length; i++) {
       var q = request.quotes[i];
       var quoteUpdate = {
-          partner: idName(q.partner),
-          fleet: idName(q.fleet),
+          network: idName(q.network),
+          product: idName(q.product),
           eta: getMomentFromISOString(q.eta),
           vehicleType: q.vehicleType,
           price: q.price,
@@ -451,8 +451,8 @@ function createGetQuoteResponseFromQuote(quote) {
   for(var i = 0; quote.receivedQuotes.length; i++) {
     var q = quote.receivedQuotes[i];
     r.quotes.push({
-      partner: idName(q.partner),
-      fleet: idName(q.fleet),
+      network: idName(q.network),
+      product: idName(q.product),
       driver: idName(q.driver),
       passenger: idName(q.passenger),
       eta: getISOStringFromMoment(q.eta),
@@ -526,7 +526,7 @@ function createQuoteFromRequest(quote, type, args) {
   }
 }
 
-module.exports.createGetPartnerInfoResponse = createGetPartnerInfoResponse;
+module.exports.createGetNetworkInfoResponse = createGetNetworkInfoResponse;
 module.exports.createRequestFromTrip = createRequestFromTrip;
 module.exports.createResponseFromTrip = createResponseFromTrip;
 module.exports.createTripFromRequest = createTripFromRequest;

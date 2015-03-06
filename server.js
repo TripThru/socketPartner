@@ -19,26 +19,26 @@ app.all('*', function(req, res, next){
   next();
 });
 
-function init(partnersById) { 
-  for(var id in partnersById) {
+function init(networksById) { 
+  for(var id in networksById) {
     (function(id){
-      var name = partnersById[id].name.replace(/ /g, '');
-      var partner = partnersById[id];
+      var name = networksById[id].name.replace(/ /g, '');
+      var network = networksById[id];
       app.post('/' + name + '/quote', function(req, res){   
         var request = req.body;
-        partner.bookingsQuoteTrip(request, function(response){
+        network.bookingsQuoteTrip(request, function(response){
           res.json(response);
         });
       });
       app.post('/' + name + '/trip',  function(req, res){
         var request = req.body;
-        partner.bookingsDispatchTrip(request, function(response){
+        network.bookingsDispatchTrip(request, function(response){
           res.json(response);
         });
       }); 
       app.get('/' + name + '/tripstatus/:tripId', function(req, res) {
         var request = { id: req.params.tripId };
-        partner.bookingsGetTripStatus(request, function(response){
+        network.bookingsGetTripStatus(request, function(response){
           res.json(response);
         });
       });

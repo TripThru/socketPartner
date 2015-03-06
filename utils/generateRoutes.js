@@ -5,7 +5,7 @@
  */
 
 var maptools = require('../src/map_tools').MapTools;
-var tripsByCity = require('../partner_config/data/tripsByCity');
+var tripsByCity = require('../network_config/data/tripsByCity');
 
 var tripsList = [];
 for(var city in tripsByCity) {

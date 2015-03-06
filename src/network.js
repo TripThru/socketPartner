@@ -13,7 +13,7 @@ var PromiseHelper = require('./promise_helper');
 var resultCodes = codes.resultCodes;
 var moment = require('moment');
 
-function Partner(config) {
+function Network(config) {
   
   if(!config.id) {
     throw new Error('Id is required');
@@ -40,28 +40,28 @@ function Partner(config) {
   for(var j = 0; j < config.fleets.length; j++) {
     var fleet = config.fleets[j];
     this.fleetsById[fleet.id] = fleet;
-    fleet.setPartner(this);
+    fleet.setNetwork(this);
   }
-  this.preferedPartnerId = config.preferedPartnerId;
+  this.preferedNetworkId = config.preferedNetworkId;
   this.activeTripsByPublicId = {};
   this.tripRemovalDuration = moment.duration(3, 'minute');
 }
 
-Partner.prototype.getPartnerInfo = function(request, cb) {
-  cb(TripThruApiFactory.createGetPartnerInfoResponse(this.fleets));
+Network.prototype.getNetworkInfo = function(request, cb) {
+  cb(TripThruApiFactory.createGetNetworkInfoResponse(this.fleets));
 };
 
-Partner.prototype.setPartnerInfoAtTripThru = function(cb) {
-  var request = TripThruApiFactory.createGetPartnerInfoResponse(this.fleets);
+Network.prototype.setNetworkInfoAtTripThru = function(cb) {
+  var request = TripThruApiFactory.createGetNetworkInfoResponse(this.fleets);
   this
     .gatewayClient
-    .setPartnerInfo(request)
+    .setNetworkInfo(request)
     .then(function(res){
       cb(res);
     });
 };
 
-Partner.prototype.dispatchTrip = function(request, cb) {
+Network.prototype.dispatchTrip = function(request, cb) {
   var trip = TripThruApiFactory.createTripFromRequest(request, 'dispatch');
   logger.log(trip.publicId, this.id + ' received dispatch request');
   
@@ -97,12 +97,12 @@ Partner.prototype.dispatchTrip = function(request, cb) {
     });
 };
 
-Partner.prototype.dispatchToSpecificDriver = function(trip) {
+Network.prototype.dispatchToSpecificDriver = function(trip) {
   logger.log(trip.publicId, 'Dispatching to specific driver ' + trip.driver.id);
   throw new Error('Not implemented');
 };
 
-Partner.prototype.dispatchToSpecificFleet = function(trip) {
+Network.prototype.dispatchToSpecificFleet = function(trip) {
   logger.log(trip.publicId, 'Dispatching to fleet ' + trip.fleet.id);
   var fleet = this.fleetsById[trip.fleet.id];
   
@@ -116,7 +116,7 @@ Partner.prototype.dispatchToSpecificFleet = function(trip) {
   return Promise.resolve(null);
 };
 
-Partner.prototype.dispatchToFirstFleetThatServes = function(trip) {
+Network.prototype.dispatchToFirstFleetThatServes = function(trip) {
   logger.log(trip.publicId, 'Dispatching to first fleet that serves');
   for(var i = 0; i < this.fleets.length; i++) {
     var fleet = this.fleets[i];
@@ -131,7 +131,7 @@ Partner.prototype.dispatchToFirstFleetThatServes = function(trip) {
   Promise.resolve(null);
 };
 
-Partner.prototype.getTripStatus = function(request, cb) {
+Network.prototype.getTripStatus = function(request, cb) {
   var trip = TripThruApiFactory.createTripFromRequest(request, 'get-trip-status');
   var response;
   if(!this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
@@ -140,13 +140,13 @@ Partner.prototype.getTripStatus = function(request, cb) {
   } else {
     var t = this.activeTripsByPublicId[trip.publicId];
     response = TripThruApiFactory.createResponseFromTrip(t, 'get-trip-status', 
-        null, null, {partner: this});
+        null, null, {network: this});
     logger.log(t.id, this.id + ' received get status request');
   }
   cb(response);
 };
 
-Partner.prototype.updateTripStatus = function(request, cb) {
+Network.prototype.updateTripStatus = function(request, cb) {
   var trip = TripThruApiFactory.createTripFromRequest(request, 'update-trip-status');
   
   if(!this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
@@ -164,11 +164,11 @@ Partner.prototype.updateTripStatus = function(request, cb) {
   cb(TripThruApiFactory.createResponseFromTrip(t, 'update-trip-status'));
 };
 
-Partner.prototype.getTrip = function(request, cb) {
+Network.prototype.getTrip = function(request, cb) {
   throw new Error('Not implemented');
 };
 
-Partner.prototype.requestPayment = function(request, cb) {
+Network.prototype.requestPayment = function(request, cb) {
   logger.log(request.id, this.id + ' received payment request');
   
   var trip = 
@@ -190,7 +190,7 @@ Partner.prototype.requestPayment = function(request, cb) {
   }.bind(this), 1000);
 };
 
-Partner.prototype.acceptPayment = function(request, cb) {
+Network.prototype.acceptPayment = function(request, cb) {
   logger.log(request.id, this.id + ' received accept payment request');
   
   var trip = 
@@ -205,7 +205,7 @@ Partner.prototype.acceptPayment = function(request, cb) {
   cb(response);
 };
 
-Partner.prototype.quoteTrip = function(request, cb) {
+Network.prototype.quoteTrip = function(request, cb) {
   logger.log(request.id, this.id + ' received quotetrip');
   cb(TripThruApiFactory.createResponseFromQuoteRequest(request));
   
@@ -218,7 +218,7 @@ Partner.prototype.quoteTrip = function(request, cb) {
     });
 };
 
-Partner.prototype.updateQuote = function(request, cb) {
+Network.prototype.updateQuote = function(request, cb) {
   logger.log(request.id, this.id + ' received quote update');
   quotes
     .getById(request.id)
@@ -226,7 +226,7 @@ Partner.prototype.updateQuote = function(request, cb) {
     .then(function(q){
       if(q) {
         this.quote = q;
-        var partnerQuote = TripThruApiFactory.createQuoteFromRequest(request, 
+        var networkQuote = TripThruApiFactory.createQuoteFromRequest(request, 
             'update', {quote: q});
         return quotes.update(this.quote);
       }
@@ -243,25 +243,25 @@ Partner.prototype.updateQuote = function(request, cb) {
     });
 };
 
-Partner.prototype.getQuote = function(request, cb) {
+Network.prototype.getQuote = function(request, cb) {
   throw new Error('Not implemented');
 };
 
-Partner.prototype.update = function() {
+Network.prototype.update = function() {
   return PromiseHelper.runInSequence(this.fleets, function(fleet){
     return fleet.simulate();
   });
 };
 
-Partner.prototype.tryToCreateLocalTripAtTripThru = function(trip) {
+Network.prototype.tryToCreateLocalTripAtTripThru = function(trip) {
   logger.log(trip.id, 'Creating local trip in TripThru');
   return this.tryToDispatchToForeignProvider(trip, this.id);
 };
 
-Partner.prototype.tryToDispatchToForeignProvider = function(trip, partnerId) {
-  var partner = partnerId ? {partner: {id: partnerId, name: partnerId}} : null;
+Network.prototype.tryToDispatchToForeignProvider = function(trip, networkId) {
+  var network = networkId ? {network: {id: networkId, name: networkId}} : null;
   var request = 
-    TripThruApiFactory.createRequestFromTrip(trip, 'dispatch', partner);
+    TripThruApiFactory.createRequestFromTrip(trip, 'dispatch', network);
   return this
     .gatewayClient
     .dispatchTrip(request)
@@ -269,7 +269,7 @@ Partner.prototype.tryToDispatchToForeignProvider = function(trip, partnerId) {
     .then(function(response){
       var success = response.result === resultCodes.ok;
       if(success) {
-        if(partnerId === this.id) {
+        if(networkId === this.id) {
           logger.log(trip.id, 'Local trip was created in TripThru');
         } else {
           trip.service = 'foreign';
@@ -282,18 +282,18 @@ Partner.prototype.tryToDispatchToForeignProvider = function(trip, partnerId) {
     });
 };
 
-Partner.prototype.sendPaymentRequestToTripThru = function(trip) {
+Network.prototype.sendPaymentRequestToTripThru = function(trip) {
   var paymentRequest = 
     TripThruApiFactory.createTripPaymentRequestFromTrip(trip, 'request-payment');
   this.gatewayClient.requestPayment(paymentRequest);
 };
 
-Partner.prototype.addTrip = function(trip) {
+Network.prototype.addTrip = function(trip) {
   this.activeTripsByPublicId[trip.publicId] = trip;
   //trips.createTrip(trip);
 };
 
-Partner.prototype.deactivateTrip = function(trip, status) {
+Network.prototype.deactivateTrip = function(trip, status) {
   //trips.updateTrip(trip);
   var self = this;
   setTimeout(function(){
@@ -301,7 +301,7 @@ Partner.prototype.deactivateTrip = function(trip, status) {
   }, this.tripRemovalDuration.asMilliseconds());
 };
 
-Partner.prototype.updateForeignPartner = function(trip) {
+Network.prototype.updateForeignNetwork = function(trip) {
   var request = TripThruApiFactory.createRequestFromTrip(trip, 'update-trip-status');
   return this.gatewayClient.updateTripStatus(request);
 };
@@ -309,7 +309,7 @@ Partner.prototype.updateForeignPartner = function(trip) {
 //This are helper function used only by the bookings website, to simulate a sync
 //quoting process simplifying the bookings website adaptation to the Node api
 
-Partner.prototype.bookingsQuoteTrip = function(request, cb) {
+Network.prototype.bookingsQuoteTrip = function(request, cb) {
   var quote = TripThruApiFactory.createQuoteFromRequest(request, 'quote');
   quotes
     .getById(quote.id)
@@ -347,7 +347,7 @@ Partner.prototype.bookingsQuoteTrip = function(request, cb) {
     });
 };
 
-Partner.prototype.bookingsGetTripStatus = function(request, cb) {
+Network.prototype.bookingsGetTripStatus = function(request, cb) {
   var t = TripThruApiFactory.createTripFromRequest(request, 'get-trip-status');
   if(!this.activeTripsByPublicId.hasOwnProperty(t.publicId)) {
     var response = TripThruApiFactory.createResponseFromTrip(null, null, 
@@ -359,7 +359,7 @@ Partner.prototype.bookingsGetTripStatus = function(request, cb) {
   var trip = this.activeTripsByPublicId[t.publicId];
   if(trip.service === 'local' || trip.status === 'booking') {
     var response = TripThruApiFactory.createResponseFromTrip(trip, 'get-trip-status', 
-        null, null, {partner: this});
+        null, null, {network: this});
     cb(response);
   } else {
     this
@@ -371,9 +371,9 @@ Partner.prototype.bookingsGetTripStatus = function(request, cb) {
   }
 };
 
-Partner.prototype.bookingsDispatchTrip = function(request, cb) {
+Network.prototype.bookingsDispatchTrip = function(request, cb) {
   var trip = TripThruApiFactory.createTripFromRequest(request, 'dispatch');
-  if(request.partner.id === this.id) {
+  if(request.network.id === this.id) {
     this
       .dispatchToFirstFleetThatServes(trip)
       .then(function(t){
@@ -402,7 +402,7 @@ Partner.prototype.bookingsDispatchTrip = function(request, cb) {
     } else {
       t.updateStatus(false, 'booking');
       this
-        .tryToDispatchToForeignProvider(t, request.partner.id)
+        .tryToDispatchToForeignProvider(t, request.network.id)
         .then(function(success){
           t.updateStatus(false, 'dispatched');
           cb(TripThruApiFactory.createResponseFromTrip(t, 'dispatch'));
@@ -411,4 +411,4 @@ Partner.prototype.bookingsDispatchTrip = function(request, cb) {
   }
 };
 
-module.exports = Partner;
+module.exports = Network;

@@ -9,9 +9,9 @@ var Promise = require('bluebird');
 var PromiseHelper = require('./promise_helper');
 var simulationData = require('./models/simulation_data');
 
-var IFleet = new Interface('fleet', ['simulate','setPartner']);
+var IProduct = new Interface('product', ['simulate','setNetwork']);
 
-function Fleet(config) {
+function Product(config) {
   
   if(!config.id) {
     throw new Error('Id is required');
@@ -70,7 +70,7 @@ function Fleet(config) {
   this.updateInterval = moment.duration(30, 'seconds');
   this.expectedDelayWhenNoDriversAvailable = moment.duration(3, 'hours');
   this.nextId = 0;
-  this.partner = null;
+  this.network = null;
   this.tripsId = this.id.toLowerCase() + '@tripthru.com';
   this.queue = [];
   
@@ -78,11 +78,11 @@ function Fleet(config) {
   this.returningDrivers = [];
 }
 
-Fleet.prototype.setPartner = function(partner) {
-  this.partner = partner;
+Product.prototype.setNetwork = function(network) {
+  this.network = network;
 };
 
-Fleet.prototype.createDriver = function() {
+Product.prototype.createDriver = function() {
   if(this.maxDriversReached()) {
     return null;
   }
@@ -93,26 +93,26 @@ Fleet.prototype.createDriver = function() {
   var driver = {
       id: driverName,
       name: driverName,
-      fleet: this,
+      product: this,
       location: this.location
   };
   return this.drivers[driver.id] = driver;
 };
 
-Fleet.prototype.deleteDriver = function(driver) {
+Product.prototype.deleteDriver = function(driver) {
   if(!this.drivers.hasOwnProperty(driver.id)) {
     throw new Error('Driver doesn\'t exist');
   }
   delete this.drivers[driver.id];
 };
 
-Fleet.prototype.maxDriversReached = function() {
+Product.prototype.maxDriversReached = function() {
   return Object.keys(this.drivers).length >= this.maxDrivers;
 };
 
-Fleet.prototype.simulate = function() {
-  if(!this.partner) {
-    throw new Error('partner not set');
+Product.prototype.simulate = function() {
+  if(!this.network) {
+    throw new Error('network not set');
   }
   this.generateRandomTrips();
   return this
@@ -124,7 +124,7 @@ Fleet.prototype.simulate = function() {
     });
 };
 
-Fleet.prototype.generateRandomTrips = function() {
+Product.prototype.generateRandomTrips = function() {
   if(this.queue.length >= this.maxActiveTrips) {
     return;
   }
@@ -148,48 +148,48 @@ Fleet.prototype.generateRandomTrips = function() {
   }
 };
 
-Fleet.prototype.generateRandomTrip = function(now) {
+Product.prototype.generateRandomTrip = function(now) {
   var passenger = simulationData.getRandomName();
   passenger = {id: passenger, name: passenger};
-  var fromTo = simulationData.getRandomFarmedOutTrip(this.partner.fleets);
+  var fromTo = simulationData.getRandomFarmedOutTrip(this.network.products);
   var pickupTime = moment(now).add(this.tripMaxAdvancedNotice);
   var from = new Location(fromTo.start.lat, fromTo.start.lng);
   var to = new Location(fromTo.end.lat, fromTo.end.lng);
   this.queueTrip(this.createTrip(passenger, pickupTime, from, to));
 };
 
-Fleet.prototype.createTrip = function(passenger, pickupTime, from, to, foreignId) {
+Product.prototype.createTrip = function(passenger, pickupTime, from, to, foreignId) {
   var trip = new Trip({
     id: foreignId ? this.generatePrivateId(foreignId) : this.generateTripId(),
     idNumber: foreignId ? undefined : this.nextId,
-    partner: this.partner,
+    network: this.network,
     origination: foreignId ? 'foreign' : 'local',
     pickupLocation: from,
     pickupTime: pickupTime,
     passenger: passenger,
     dropoffLocation: to,
     paymentMethod: 'cash',
-    fleet: this
+    product: this
   });
   logger.log('sim', passenger.id + ' requests to be picked up at ' + from + ' on ' + pickupTime.format() + ' and dropped off at ' + to);
   return trip;
 };
 
-Fleet.prototype.queueTrip = function(trip) {
+Product.prototype.queueTrip = function(trip) {
   if(this.maxDriversReached() && trip.origination === 'foreign') {
     return false;
   }
-  if(this.partner.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
+  if(this.network.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
     throw new Error('Trip ' + trip.id + ' already exists in active trips');
   }
   logger.log('sim', 'Queueing ' + trip.id);
   this.queue.push(trip);
-  this.partner.addTrip(trip);
+  this.network.addTrip(trip);
   trip.updateStatus(false, 'queued');
   return true;
 };
 
-Fleet.prototype.processQueue = function() {
+Product.prototype.processQueue = function() {
   return PromiseHelper
     .runInSequence(this.queue, this.processTrip.bind(this))
     .bind(this)
@@ -198,7 +198,7 @@ Fleet.prototype.processQueue = function() {
     });
 };
 
-Fleet.prototype.processTrip = function(trip) {
+Product.prototype.processTrip = function(trip) {
   var promise;
   switch(trip.status) {
     case 'queued':
@@ -241,7 +241,7 @@ Fleet.prototype.processTrip = function(trip) {
   }
 };
 
-Fleet.prototype.processStatusQueued = function(trip) {
+Product.prototype.processStatusQueued = function(trip) {
   if(trip.autoDispatch && this.dispatchRetryIntervalReached(trip)) {
     trip.lastDispatchAttempt = moment();
     return this.dispatch(trip);
@@ -249,12 +249,12 @@ Fleet.prototype.processStatusQueued = function(trip) {
   return Promise.resolve();
 };
 
-Fleet.prototype.dispatchRetryIntervalReached = function(trip) {
+Product.prototype.dispatchRetryIntervalReached = function(trip) {
   var tryAgain = moment(trip.lastDispatchAttempt).add(this.retryInterval);
   return !trip.lastDispatchAttempt || moment().isAfter(tryAgain);
 };
 
-Fleet.prototype.dispatch = function(trip) {
+Product.prototype.dispatch = function(trip) {
   if(trip.origination === 'local') {
     if(this.missedPeriodReached(trip)) {
       return this.cancelTrip(trip);
@@ -277,7 +277,7 @@ Fleet.prototype.dispatch = function(trip) {
             trip.pickupTime);
       } else if(trip.origination === 'local') {
         return this
-          .partner
+          .network
           .tryToDispatchToForeignProvider(trip)
           .then(function(success){
             if(success) {
@@ -288,25 +288,25 @@ Fleet.prototype.dispatch = function(trip) {
     });
 };
 
-Fleet.prototype.missedPeriodReached = function(trip) {
+Product.prototype.missedPeriodReached = function(trip) {
   return moment().isAfter(moment(trip.pickupTime).add(this.missedPeriod));
 };
 
-Fleet.prototype.criticalPeriodNotYetReached = function(trip) {
+Product.prototype.criticalPeriodNotYetReached = function(trip) {
   return moment().isBefore(moment(trip.pickupTime).subtract(this.criticalPeriod));
 };
 
-Fleet.prototype.cancelTrip = function(trip) {
+Product.prototype.cancelTrip = function(trip) {
   logger.log(trip.id, 'Missed period reached: -- so cancel');
-  var shouldNotifyPartner = trip.service === 'foreign' && this.isActiveStatus(trip.status);
-  return trip.updateStatus(shouldNotifyPartner, 'cancelled');
+  var shouldNotifyNetwork = trip.service === 'foreign' && this.isActiveStatus(trip.status);
+  return trip.updateStatus(shouldNotifyNetwork, 'cancelled');
 };
 
-Fleet.prototype.isActiveStatus = function(status) {
+Product.prototype.isActiveStatus = function(status) {
   return status === 'dispatched' || status === 'enroute' || status === 'pickedup';
 };
 
-Fleet.prototype.tryDispatchLocally = function(trip) {
+Product.prototype.tryDispatchLocally = function(trip) {
   logger.log(trip.id, 'Dispatch locally');
   
   if(!this.servesLocation(trip.pickupLocation)) {
@@ -322,7 +322,7 @@ Fleet.prototype.tryDispatchLocally = function(trip) {
     this.dispatchToFirstAvailableDriver(trip);
     if(trip.origination === 'local') {
       return this
-        .partner
+        .network
         .tryToCreateLocalTripAtTripThru(trip);
     } else {
       return Promise.resolve(true);
@@ -332,23 +332,23 @@ Fleet.prototype.tryDispatchLocally = function(trip) {
   }
 };
 
-Fleet.prototype.servesLocation = function(location) {
+Product.prototype.servesLocation = function(location) {
   return maptools.isInside(location, this.coverage);
 };
 
-Fleet.prototype.dispatchToFirstAvailableDriver = function(trip) {
+Product.prototype.dispatchToFirstAvailableDriver = function(trip) {
   if(this.maxDriversReached()) {
     throw new Error('Invalid condition: no available drivers');
   }
   trip.driver = this.createDriver();
-  trip.fleet = this;
+  trip.product = this;
   if(!trip.driver) {
     throw new Error('Invalid condition: driver is not defined');
   } 
   logger.log(trip.id, 'Dispatched to: ' + trip.driver.id);
 };
 
-Fleet.prototype.processStatusDispatched = function(trip) {
+Product.prototype.processStatusDispatched = function(trip) {
   if(trip.service === 'foreign') {
     return Promise.resolve();
   }
@@ -365,7 +365,7 @@ Fleet.prototype.processStatusDispatched = function(trip) {
     });
 };
 
-Fleet.prototype.driverWillBeLateIfHeDoesntLeaveNow = function(trip) {
+Product.prototype.driverWillBeLateIfHeDoesntLeaveNow = function(trip) {
   if(!trip.driver) {
     throw new Error('Trip ' + trip.id + ' doesn\'t have a driver');
   }
@@ -386,7 +386,7 @@ Fleet.prototype.driverWillBeLateIfHeDoesntLeaveNow = function(trip) {
     });
 };
 
-Fleet.prototype.makeTripEnroute = function(trip) {
+Product.prototype.makeTripEnroute = function(trip) {
   logger.log(trip.id, 'Driver is now enroute');
   return this
     .updateDriverRouteAndGetETA(trip, trip.pickupLocation)
@@ -396,7 +396,7 @@ Fleet.prototype.makeTripEnroute = function(trip) {
     });
 };
 
-Fleet.prototype.updateDriverRouteAndGetETA = function(trip, destination) {
+Product.prototype.updateDriverRouteAndGetETA = function(trip, destination) {
   trip.driver.routeStartTime = moment();
   return maptools
     .getRoute(trip.driver.location, destination)
@@ -409,17 +409,17 @@ Fleet.prototype.updateDriverRouteAndGetETA = function(trip, destination) {
     });
 };
 
-Fleet.prototype.tripStatusUpdateIntervalReached = function(trip) {
+Product.prototype.tripStatusUpdateIntervalReached = function(trip) {
   return !trip.lastUpdate || 
     moment().isAfter(moment(trip.lastUpdate).add(this.updateInterval));
 };
 
-Fleet.prototype.logTheNewDriverLocation = function(trip) {
+Product.prototype.logTheNewDriverLocation = function(trip) {
   logger.log(trip.id, 'Status of driver: ' + trip.driver.location.id);
   trip.lastUpdate = moment();
 };
 
-Fleet.prototype.processStatusEnroute = function(trip) {
+Product.prototype.processStatusEnroute = function(trip) {
   if(trip.service === 'foreign') {
     return Promise.resolve();
   }
@@ -433,7 +433,7 @@ Fleet.prototype.processStatusEnroute = function(trip) {
   return Promise.resolve();
 };
 
-Fleet.prototype.updateTripDriverLocation = function(trip) {
+Product.prototype.updateTripDriverLocation = function(trip) {
   if(!trip.driver) {
     throw new Error('Driver is null');
   }
@@ -444,11 +444,11 @@ Fleet.prototype.updateTripDriverLocation = function(trip) {
     trip.driver.route.getCurrentWaypoint(trip.driver.routeStartTime, moment());
 };
 
-Fleet.prototype.driverHasReachedPickupLocation = function(trip) {
+Product.prototype.driverHasReachedPickupLocation = function(trip) {
   return maptools.locationsAreEqual(trip.driver.location, trip.pickupLocation);
 };
 
-Fleet.prototype.makeTripPickedUp = function(trip) {
+Product.prototype.makeTripPickedUp = function(trip) {
   logger.log(trip.id, 'Picking up');
   return this
     .updateDriverRouteAndGetETA(trip, trip.dropoffLocation)
@@ -458,7 +458,7 @@ Fleet.prototype.makeTripPickedUp = function(trip) {
     });
 };
 
-Fleet.prototype.processStatusPickedUp = function(trip) {
+Product.prototype.processStatusPickedUp = function(trip) {
   if(trip.service === 'foreign') {
     return Promise.resolve();
   }
@@ -472,11 +472,11 @@ Fleet.prototype.processStatusPickedUp = function(trip) {
   return Promise.resolve();
 };
 
-Fleet.prototype.destinationReached = function(trip) {
+Product.prototype.destinationReached = function(trip) {
   return maptools.locationsAreEqual(trip.driver.location, trip.driver.route.end);
 };
 
-Fleet.prototype.makeTripComplete = function(trip) {
+Product.prototype.makeTripComplete = function(trip) {
   logger.log(trip.id, 'The destination has been reached');
   trip.dropoffTime = moment();
   return trip
@@ -484,17 +484,17 @@ Fleet.prototype.makeTripComplete = function(trip) {
     .bind(this)
     .then(function(){
       this.completeTrip(trip);
-      this.partner.sendPaymentRequestToTripThru(trip);
+      this.network.sendPaymentRequestToTripThru(trip);
     });
 };
 
-Fleet.prototype.completeTrip = function(trip) {
+Product.prototype.completeTrip = function(trip) {
   this.returningDrivers.push(trip.driver);
   this.updateDriverRouteAndGetETA(trip, this.location);
   trip.eta = moment();
 };
 
-Fleet.prototype.removeOldNonActiveTrips = function() {
+Product.prototype.removeOldNonActiveTrips = function() {
   var len = this.queue.length;
   while(--len >= 0) {
     var trip = this.queue[len];
@@ -513,7 +513,7 @@ Fleet.prototype.removeOldNonActiveTrips = function() {
   }
 };
 
-Fleet.prototype.removeTripIfOld = function(index, trip, age) {
+Product.prototype.removeTripIfOld = function(index, trip, age) {
   if(age.asMinutes() > this.removalAge.asMinutes()) {
     var queuelength = this.queue.length;
     this.queue.splice(index, 1);
@@ -521,15 +521,15 @@ Fleet.prototype.removeTripIfOld = function(index, trip, age) {
   }
 };
 
-Fleet.prototype.agetSinceCompletedClockHasNotBeenSet = function(trip) {
+Product.prototype.agetSinceCompletedClockHasNotBeenSet = function(trip) {
   return !trip.dropoffTime;
 };
 
-Fleet.prototype.startTheAgeSinceCompletedClockFromNow = function(trip) {
+Product.prototype.startTheAgeSinceCompletedClockFromNow = function(trip) {
   trip.dropoffTime = moment();
 };
 
-Fleet.prototype.updateReturningDriversLocation = function() {
+Product.prototype.updateReturningDriversLocation = function() {
   var len = this.returningDrivers.length;
   while(--len >= 0) {
     var driver = this.returningDrivers[len];
@@ -549,35 +549,35 @@ Fleet.prototype.updateReturningDriversLocation = function() {
   }
 };
 
-Fleet.prototype.updateDriverReturningLocation = function(driver) {
+Product.prototype.updateDriverReturningLocation = function(driver) {
   if(driver && driver.route) {
     driver.location = driver.route.getCurrentWaypoint(driver.routeStartTime, moment());
   }
 };
 
-Fleet.prototype.driverHomeOfficeReached = function(driver) {
+Product.prototype.driverHomeOfficeReached = function(driver) {
   return maptools.locationsAreEqual(driver.location, this.location);
 };
 
-Fleet.prototype.driverUpdateIntervalReached = function(driver) {
+Product.prototype.driverUpdateIntervalReached = function(driver) {
   return !driver.lastUpdate || 
     moment().isAfter(moment(driver.lastUpdate).add(this.updateInterval));
 };
 
-Fleet.prototype.generateTripId = function() {
+Product.prototype.generateTripId = function() {
   this.nextId++;
   return this.generatePrivateId(this.nextId + '@' + this.tripsId);
 };
 
-Fleet.prototype.generateTripPublicId = function(tripId) {
+Product.prototype.generateTripPublicId = function(tripId) {
   return tripId.replace(this.id + '-', '');
 };
 
-Fleet.prototype.generatePrivateId = function(tripId) {
+Product.prototype.generatePrivateId = function(tripId) {
   return this.id + '-' + tripId;
 };
 
-Fleet.prototype.getPriceAndDistance = function(trip) {
+Product.prototype.getPriceAndDistance = function(trip) {
   return maptools
     .getRoute(trip.pickupLocation, trip.dropoffLocation)
     .bind(this)
@@ -589,7 +589,7 @@ Fleet.prototype.getPriceAndDistance = function(trip) {
     });
 };
 
-Fleet.prototype.getPickupEta = function(trip) {
+Product.prototype.getPickupEta = function(trip) {
   var startLocation;
   var delay; 
   if(this.maxDriversReached()) {
@@ -606,15 +606,15 @@ Fleet.prototype.getPickupEta = function(trip) {
     });
 };
 
-Fleet.prototype.healthCheck = function() {
+Product.prototype.healthCheck = function() {
   logger.log(this.id, 'Health check: ' +
       'Queue: ' + this.queue.length + 
-      ', Active trips: ' + Object.keys(this.partner.activeTripsByPublicId).length +
+      ', Active trips: ' + Object.keys(this.network.activeTripsByPublicId).length +
       ', Drivers: ' + Object.keys(this.drivers).length +
       ', Returning drivers: ' + this.returningDrivers.length
   );
 };
 
-module.exports.Fleet = Fleet;
-module.exports.IFleet = IFleet;
+module.exports.Product = Product;
+module.exports.IProduct = IProduct;
 

@@ -48,8 +48,8 @@ GatewayClient.prototype.setListener = function(listener) {
   }.bind(this));
   
   //Users
-  this.socket.on('get-partner-info', function(req ,cb){
-    this.listener.getPartnerInfo(req, cb);
+  this.socket.on('get-network-info', function(req ,cb){
+    this.listener.getNetworkInfo(req, cb);
   }.bind(this));
 };
 
@@ -90,12 +90,12 @@ GatewayClient.prototype.emit = function(action, request) {
   });
 };
 
-GatewayClient.prototype.getPartnerInfo = function(request) {
-  return this.emit('get-partner-info', request);
+GatewayClient.prototype.getNetworkInfo = function(request) {
+  return this.emit('get-network-info', request);
 };
 
-GatewayClient.prototype.setPartnerInfo = function(request) { 
-  return this.emit('set-partner-info', request);
+GatewayClient.prototype.setNetworkInfo = function(request) { 
+  return this.emit('set-network-info', request);
 };
 
 GatewayClient.prototype.dispatchTrip = function(request) {

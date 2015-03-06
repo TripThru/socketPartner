@@ -10,8 +10,8 @@ function cloneQuote(quote) {
   for(var i = 0; i < quote.receivedQuotes.length; i++) {
     var q = quote.receivedQuotes[i];
     var rq = {
-      partner: q.partner,
-      fleet: q.fleet,
+      network: q.network,
+      product: q.product,
       eta: q.eta,
       vehicleType: q.vehicleType,
       price: q.price,

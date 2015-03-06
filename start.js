@@ -1,77 +1,77 @@
-var partnerConfigName = process.argv[2];
-if(!partnerConfigName) {
-  throw new Error('Please specify a partner configuration name');
+var networkConfigName = process.argv[2];
+if(!networkConfigName) {
+  throw new Error('Please specify a network configuration name');
 }
 var healthcheck = require('./healthcheck');
 var logger = require('./src/logger');
 var server = require('./server');
 var fs = require('fs');
 var GatewayClient = require('./src/gateway_client');
-var PartnerFactory = require('./src/partner_factory');
-var configDirectory = './partner_config/';
+var NetworkFactory = require('./src/network_factory');
+var configDirectory = './network_config/';
 var globalConfig = require('./config');
 
-function start(partner, interval) {
-  partner
+function start(network, interval) {
+  network
     .update()
     .then(function(){
       setTimeout(function(){
-        start(partner, interval);
+        start(network, interval);
       }, interval);
     })
     .error(function(err){
-      logger.log('sim', 'Partner ' + partner.id + ' crashed: ' + err);
+      logger.log('sim', 'Network ' + network.id + ' crashed: ' + err);
     });
 }
 
 var started = {};
 
-function runOnePartner(name) {
+function runOneNetwork(name) {
   var config = require(configDirectory + name);
   config.tripthru.url = globalConfig.tripthru.url;
   logger.log('init', 'Loading configuration ' + name);
   var simulationInterval = config.simulationInterval*1000;
   var client = new GatewayClient('client' + config.name, 'client' + config.name, 
       config.clientId);
-  logger.log('init', 'Creating partner ' + name + 'from configuration...');
-  var partner = PartnerFactory.createPartner(client, config);
+  logger.log('init', 'Creating network ' + name + 'from configuration...');
+  var network = NetworkFactory.createNetwork(client, config);
 
   logger.log('init', 'Opening socket client ' + name + '...');
   client.open(config.tripthru.url, config.tripthru.token, function() {
     logger.log('init', 'Socket open, starting simulation ' + name + '...');
-    client.setListener(partner);
+    client.setListener(network);
     if(!started.hasOwnProperty(name)){
       started[name] = true;
-      partner.setPartnerInfoAtTripThru(function(){
+      network.setNetworkInfoAtTripThru(function(){
         setTimeout(function(){
-          start(partner, simulationInterval);
+          start(network, simulationInterval);
         }, 5000);
       });
     }
   });
   
-  return partner;
+  return network;
 }
 
 function endsWith(str, suffix) {
   return str.indexOf(suffix, str.length - suffix.length) !== -1;
 }
 
-function startServer(partnersById){
-  server.init(partnersById);
+function startServer(networksById){
+  server.init(networksById);
 }
 
-function runAllPartners() {
+function runAllNetworks() {
   var files = fs.readdirSync(configDirectory);
-  var partnersById = [];
+  var networksById = [];
   for(var i = 0; i < files.length; i++) {
     if(endsWith(files[i].toString(), '.js')) {
-      var partner = runOnePartner(files[i]);
-      partnersById[partner.id] = partner;
+      var network = runOneNetwork(files[i]);
+      networksById[network.id] = network;
     }
   }
   logger.log('init', 'Starting express...');
-  startServer(partnersById);
+  startServer(networksById);
 }
 
 var configName = process.argv[2];
@@ -79,7 +79,7 @@ if(!configName) {
   throw new Error('Please specify a configuration name or \'all\' to run all');
 }
 if(configName === 'all') {
-  runAllPartners();
+  runAllNetworks();
 } else {
-  runOnePartner(configName);
+  runOneNetwork(configName);
 }

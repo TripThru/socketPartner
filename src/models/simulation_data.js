@@ -1,6 +1,6 @@
-var cities = require('../../partner_config/data/cities');
-var names = require('../../partner_config/data/names');
-var tripsByCity = require('../../partner_config/data/tripsByCity');
+var cities = require('../../network_config/data/cities');
+var names = require('../../network_config/data/names');
+var tripsByCity = require('../../network_config/data/tripsByCity');
 var cityNames = [];
 for(var cityName in cities) {
   cityNames.push(cityName);
@@ -19,15 +19,15 @@ function getRandomName() {
   return name[0];
 }
 
-function getRandomFarmedOutTrip(partnerFleets) {
+function getRandomFarmedOutTrip(networkProducts) {
   if(!tripsByCity.hasOwnProperty(cityName)) {
     throw new Error('Unknown city ' + cityName);
   }
   var coveredCities = {};
-  for(var i = 0; i < partnerFleets.length; i++) {
-    coveredCities[partnerFleets[i].city] = 0;
+  for(var i = 0; i < networkProducts.length; i++) {
+    coveredCities[networkProducts[i].city] = 0;
   }
-  var randomCity = partnerFleets[0].city;
+  var randomCity = networkProducts[0].city;
   while(coveredCities.hasOwnProperty(randomCity)) {
     randomCity = cityNames[Math.floor(Math.random()*cityNames.length)];  
   }

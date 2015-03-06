@@ -20,15 +20,15 @@ var route = new mongoose.Schema({
 
 var trip = new mongoose.Schema({
   id: { type: String, trim: true, required: true },
-  originatingPartner: { 
+  originatingNetwork: { 
     id: { type: String, trim: true },
     name: String
   },
-  servicingPartner: { 
+  servicingNetwork: { 
     id: { type: String, trim: true },
     name: String
   },
-  fleet: { 
+  product: { 
     id: { type: String, trim: true },
     name: String
   },
@@ -58,11 +58,11 @@ var trip = new mongoose.Schema({
 
 
  var quoteResponseSchema = {
-      partner: {
+      network: {
         id: { type: String, trim: true },
         name: String
       },
-      fleet: {
+      product: {
         id: { type: String, trim: true },
         name: String
       },

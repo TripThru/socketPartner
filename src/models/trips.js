@@ -6,8 +6,8 @@ function momentsToDates(trip) {
   t.id = trip.id;
   t.publicId = trip.publicId;
   t.idNumber = trip.idNumber;
-  t.fleet = trip.fleet;
-  t.partner = trip.fleet.partner;
+  t.product = trip.product;
+  t.network = trip.product.network;
   t.status = t.status;
   t.driver = trip.driver;
   t.passenger = trip.passenger;
@@ -23,7 +23,7 @@ function momentsToDates(trip) {
   t.maxPrice = trip.maxPrice;
   t.minRating = trip.minRating;
   t.autoDispatch = trip.autoDispatch;
-  t.lastStatusNotifiedToPartner = trip.lastStatusNotifiedToPartner;
+  t.lastStatusNotifiedToNetwork = trip.lastStatusNotifiedToNetwork;
   if(trip.pickupTime) t.pickupTime = trip.pickupTime.toDate();
   if(trip.dropoffTime) t.dropoffTime = trip.dropoffTime.toDate();
   if(trip.eta) t.eta = trip.eta.toDate();

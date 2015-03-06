@@ -20,7 +20,7 @@ function getLocation(x0, y0, radius) {
 }
 
 function generateRandomLocations() {
-  var cities = require('../partner_config/data/cities');
+  var cities = require('../network_config/data/cities');
   var tripsByCity = {};
   var radiusInMeters = 2000;
   
@@ -41,7 +41,7 @@ function generateRandomLocations() {
 }
 
 function generateTripsFromLocations() {
-  var cities = require('../partner_config/data/cities');
+  var cities = require('../network_config/data/cities');
   var locationsByCity = require('./locationsByCity');
   var tripsByCity = {};
   for(var city in cities) {

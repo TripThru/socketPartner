@@ -7,8 +7,8 @@ function Trip(config) {
   if(!config.id) {
     throw new Error('Id is required');
   }
-  if(!config.fleet) {
-    throw new Error('Fleet is required');
+  if(!config.product) {
+    throw new Error('Product is required');
   }
   if(!config.origination) {
     throw new Error('Origination is required');
@@ -28,10 +28,10 @@ function Trip(config) {
   
   
   this.id = config.id;
-  this.publicId = config.fleet.generateTripPublicId(config.id);
+  this.publicId = config.product.generateTripPublicId(config.id);
   this.idNumber = config.idNumber;
-  this.fleet = config.fleet;
-  this.partner = config.fleet.partner;
+  this.product = config.product;
+  this.network = config.product.network;
   this.status = 'new';
   this.driver = config.driver;
   this.passenger = config.passenger;
@@ -54,7 +54,7 @@ function Trip(config) {
   this.eta = null;
   this.distance = 0;
   this.duration = moment.duration(0, 'seconds');
-  this.lastStatusNotifiedToPartner = null;
+  this.lastStatusNotifiedToNetwork = null;
   this.lastDispatchAttempt = null;
 }
 
@@ -78,7 +78,7 @@ Trip.prototype.statusHasChanged = function(status, driverLocation, eta) {
   return statusChanged;
 };
 
-Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, eta, distanceToNextPoint, durationToNextPoint) {
+Trip.prototype.updateStatus = function(notifyNetwork, status, driverLocation, eta, distanceToNextPoint, durationToNextPoint) {
   var promiseToUpdate = Promise.resolve();
   if(this.statusHasChanged(status, driverLocation, eta)) {
     logger.log(this.id, 'Status has changed from ' + this.status + ' to ' +
@@ -107,7 +107,7 @@ Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, et
             .bind(this)
             .then(function(){
               return this
-                .fleet
+                .product
                 .getPriceAndDistance(this)
                 .bind(this)
                 .then(function(result){
@@ -115,35 +115,35 @@ Trip.prototype.updateStatus = function(notifyPartner, status, driverLocation, et
                 });
             });
           
-        this.partner.deactivateTrip(this, status);
+        this.network.deactivateTrip(this, status);
         break;
       case 'rejected':
       case 'cancelled':
-        /*if(this.origination === 'foreign' ||  this.fleet.missedPeriodReached(this)) {
+        /*if(this.origination === 'foreign' ||  this.product.missedPeriodReached(this)) {
           logger.log(this.id, 'Missed period reached or trip is foreign so deactivating');
-          this.partner.deactivateTrip(this, status);
-          notifyPartner = true;
+          this.network.deactivateTrip(this, status);
+          notifyNetwork = true;
         } else {
           logger.log(this.id, 'Missed period not reached yet so putting trip back to queue');
           this.status = 'queued';
           this.service = 'local';
         }*/
         if(this.origination === 'foreign') {
-          this.partner.deactivateTrip(this, status);
-          notifyPartner = true;
+          this.network.deactivateTrip(this, status);
+          notifyNetwork = true;
         }
         break;
     }
-    if(this.lastStatusNotifiedToPartner !== status && notifyPartner) {
+    if(this.lastStatusNotifiedToNetwork !== status && notifyNetwork) {
       promiseToUpdate = 
         promiseToUpdate
           .bind(this)
           .then(function(){
             return this
-              .notifyForeignPartner()
+              .notifyForeignNetwork()
               .bind(this)
               .then(function(){
-                this.lastStatusNotifiedToPartner = status;
+                this.lastStatusNotifiedToNetwork = status;
               });
           });
     }
@@ -160,12 +160,12 @@ Trip.prototype.updateDriverLocation = function(location) {
 };
 
 Trip.prototype.isActive = function() {
-  return this.partner.activeTripsByPublicId.hasOwnProperty(this.publicId);
+  return this.network.activeTripsByPublicId.hasOwnProperty(this.publicId);
 };
 
-Trip.prototype.notifyForeignPartner = function() {
+Trip.prototype.notifyForeignNetwork = function() {
   logger.log(this.id, 'Since has foreign dependency, notify TripThru');
-  return this.partner.updateForeignPartner(this);
+  return this.network.updateForeignNetwork(this);
 };
 
 Trip.prototype.hasForeignDependency = function() {

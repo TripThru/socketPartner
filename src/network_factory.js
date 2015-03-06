@@ -1,20 +1,20 @@
 var simulationData = require('./models/simulation_data');
-var Fleet = require('./fleet').Fleet;
-var Partner = require('./partner');
+var Product = require('./product').Product;
+var Network = require('./network');
 
-function PartnerFactory() {
+function NetworkFactory() {
   
 }
 
-PartnerFactory.prototype.createPartner = function(gatewayClient, configuration) {
-  var fleets = [];
+NetworkFactory.prototype.createNetwork = function(gatewayClient, configuration) {
+  var products = [];
   for(var i = 0; i < configuration.coverage.length; i++) {
     var coverage = configuration.coverage[i];
     var name = configuration.name + ' ' + coverage.city;
     var tripsPerHour = Math.floor(configuration.tripsPerHour*coverage.businessPercentage/100);
     var city = simulationData.getCity(coverage.city);
     var maxActiveTrips = Math.floor(tripsPerHour*0.3);
-    var fleet = {
+    var product = {
         id: name,
         name: name,
         city: coverage.city,
@@ -28,16 +28,16 @@ PartnerFactory.prototype.createPartner = function(gatewayClient, configuration) 
         maxDrivers: configuration.drivers,
         simulationInterval: configuration.simulationInterval
     };
-    fleets.push(new Fleet(fleet));
+    products.push(new Product(product));
   }
-  var partner = new Partner({
+  var network = new Network({
     id: configuration.clientId.replace(/ /g, ''),
     name: configuration.name,
-    preferedPartnerId: configuration.preferedPartnerId,
-    fleets: fleets,
+    preferedNetworkId: configuration.preferedNetworkId,
+    products: products,
     gatewayClient: gatewayClient
   });
-  return partner;
+  return network;
 };
 
-module.exports = new PartnerFactory();
+module.exports = new NetworkFactory();
