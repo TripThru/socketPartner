@@ -49,6 +49,30 @@ function Product(config) {
   if(!config.simulationInterval) {
     throw new Error('Simulation interval is required');
   }
+  if(!config.currencyCode) {
+    throw new Error('Currency code is required');
+  }
+  if(!config.capacity) {
+    throw new Error('Capacity is required');
+  }
+  if(!config.imageUrl) {
+    throw new Error('Image url is required');
+  }
+  if(!config.acceptsPrescheduled) {
+    throw new Error('Accepts prescheduled is required');
+  }
+  if(!config.acceptsOndemand) {
+    throw new Error('Accepts ondemand is required');
+  }
+  if(!config.acceptsCashPayment) {
+    throw new Error('Accepts cash payment is required');
+  }
+  if(!config.acceptsAccountPayment) {
+    throw new Error('Accepts account payment is required');
+  }
+  if(!config.acceptsCreditcardPayment) {
+    throw new Error('Accepts creditcard payment is required');
+  }
   
   this.id = config.id.replace(/ /g, '');
   this.name = config.name;
@@ -62,6 +86,14 @@ function Product(config) {
   this.maxActiveTrips = config.maxActiveTrips;
   this.maxDrivers = config.maxDrivers;
   this.simulationInterval = moment.duration(config.simulationInterval, 'seconds');
+  this.currencyCode = config.currencyCode;
+  this.capacity = config.capacity;
+  this.imageUrl = config.imageUrl;
+  this.acceptsPrescheduled = config.acceptsPrescheduled;
+  this.acceptsOndemand = config.acceptsOndemand;
+  this.acceptsCashPayment = config.acceptsCashPayment;
+  this.acceptsAccountPayment = config.acceptsAccountPayment;
+  this.acceptsCreditcardPayment = config.acceptsCreditcardPayment;
   this.tripMaxAdvancedNotice = moment.duration(5, 'minutes');
   this.removalAge = moment.duration(1, 'minute');
   this.retryInterval = moment.duration(3, 'minutes');
@@ -91,18 +123,14 @@ Product.prototype.createDriver = function() {
     driverName = simulationData.getRandomName() + ' ' + Math.ceil((Math.random()*1000));
   }
   var driver = {
-      id: driverName,
-      name: driverName,
-      product: this,
-      location: this.location
+    name: driverName,
+    product: this,
+    location: this.location
   };
   return this.drivers[driver.id] = driver;
 };
 
 Product.prototype.deleteDriver = function(driver) {
-  if(!this.drivers.hasOwnProperty(driver.id)) {
-    throw new Error('Driver doesn\'t exist');
-  }
   delete this.drivers[driver.id];
 };
 
@@ -149,16 +177,16 @@ Product.prototype.generateRandomTrips = function() {
 };
 
 Product.prototype.generateRandomTrip = function(now) {
-  var passenger = simulationData.getRandomName();
-  passenger = {id: passenger, name: passenger};
+  var customer = simulationData.getRandomName();
+  customer = {name: customer};
   var fromTo = simulationData.getRandomFarmedOutTrip(this.network.products);
   var pickupTime = moment(now).add(this.tripMaxAdvancedNotice);
   var from = new Location(fromTo.start.lat, fromTo.start.lng);
   var to = new Location(fromTo.end.lat, fromTo.end.lng);
-  this.queueTrip(this.createTrip(passenger, pickupTime, from, to));
+  this.queueTrip(this.createTrip(customer, pickupTime, from, to));
 };
 
-Product.prototype.createTrip = function(passenger, pickupTime, from, to, foreignId) {
+Product.prototype.createTrip = function(customer, pickupTime, from, to, foreignId) {
   var trip = new Trip({
     id: foreignId ? this.generatePrivateId(foreignId) : this.generateTripId(),
     idNumber: foreignId ? undefined : this.nextId,
@@ -166,12 +194,12 @@ Product.prototype.createTrip = function(passenger, pickupTime, from, to, foreign
     origination: foreignId ? 'foreign' : 'local',
     pickupLocation: from,
     pickupTime: pickupTime,
-    passenger: passenger,
+    customer: customer,
     dropoffLocation: to,
     paymentMethod: 'cash',
     product: this
   });
-  logger.log('sim', passenger.id + ' requests to be picked up at ' + from + ' on ' + pickupTime.format() + ' and dropped off at ' + to);
+  logger.log('sim', customer.name + ' requests to be picked up at ' + from + ' on ' + pickupTime.format() + ' and dropped off at ' + to);
   return trip;
 };
 
@@ -204,19 +232,19 @@ Product.prototype.processTrip = function(trip) {
     case 'queued':
       promise = this.processStatusQueued(trip);
       break;
-    case 'dispatched':
+    case 'accepted':
       promise = this.processStatusDispatched(trip);
       break;
-    case 'enroute':
+    case 'en_route':
       promise = this.processStatusEnroute(trip);
       break;
-    case 'pickedup':
+    case 'picked_up':
       promise = this.processStatusPickedUp(trip);
       break;
     case 'booking':
-      //special case for trips created through booking website dispatched
+      //special case for trips created through booking website accepted
       //to foreign provider
-    case 'complete':
+    case 'completed':
     case 'rejected':
     case 'cancelled':
       //wait to be removed by removeIfTripOld
@@ -273,7 +301,7 @@ Product.prototype.dispatch = function(trip) {
     .bind(this)
     .then(function(success){
       if(success) {
-        return trip.updateStatus(true, 'dispatched', trip.driver.location, 
+        return trip.updateStatus(true, 'accepted', trip.driver.location, 
             trip.pickupTime);
       } else if(trip.origination === 'local') {
         return this
@@ -281,7 +309,7 @@ Product.prototype.dispatch = function(trip) {
           .tryToDispatchToForeignProvider(trip)
           .then(function(success){
             if(success) {
-              return trip.updateStatus(false, 'dispatched');
+              return trip.updateStatus(false, 'accepted');
             }
           });
       }
@@ -303,7 +331,7 @@ Product.prototype.cancelTrip = function(trip) {
 };
 
 Product.prototype.isActiveStatus = function(status) {
-  return status === 'dispatched' || status === 'enroute' || status === 'pickedup';
+  return status === 'accepted' || status === 'en_route' || status === 'picked_up';
 };
 
 Product.prototype.tryDispatchLocally = function(trip) {
@@ -387,11 +415,11 @@ Product.prototype.driverWillBeLateIfHeDoesntLeaveNow = function(trip) {
 };
 
 Product.prototype.makeTripEnroute = function(trip) {
-  logger.log(trip.id, 'Driver is now enroute');
+  logger.log(trip.id, 'Driver is now en_route');
   return this
     .updateDriverRouteAndGetETA(trip, trip.pickupLocation)
     .then(function(eta){
-      return trip.updateStatus(true, 'enroute', trip.driver.location, eta, 
+      return trip.updateStatus(true, 'en_route', trip.driver.location, eta, 
           trip.driver.route.distance, trip.driver.route.duration);
     });
 };
@@ -453,7 +481,7 @@ Product.prototype.makeTripPickedUp = function(trip) {
   return this
     .updateDriverRouteAndGetETA(trip, trip.dropoffLocation)
     .then(function(eta){
-      return trip.updateStatus(true, 'pickedup', trip.driver.location, eta, 
+      return trip.updateStatus(true, 'picked_up', trip.driver.location, eta, 
           trip.driver.route.distance, trip.driver.route.duration);
     });
 };
@@ -480,7 +508,7 @@ Product.prototype.makeTripComplete = function(trip) {
   logger.log(trip.id, 'The destination has been reached');
   trip.dropoffTime = moment();
   return trip
-    .updateStatus(true, 'complete', trip.driver.location)
+    .updateStatus(true, 'completed', trip.driver.location)
     .bind(this)
     .then(function(){
       this.completeTrip(trip);
@@ -503,7 +531,7 @@ Product.prototype.removeOldNonActiveTrips = function() {
         moment.duration(moment().diff(trip.pickupTime));
       this.removeTripIfOld(len, trip, ageSinceCancelledOrRejected);
     }
-    if(trip.status === 'complete') {
+    if(trip.status === 'completed') {
       if(this.agetSinceCompletedClockHasNotBeenSet(trip)) {
         this.startTheAgeSinceCompletedClockFromNow(trip);
       }
@@ -577,14 +605,14 @@ Product.prototype.generatePrivateId = function(tripId) {
   return this.id + '-' + tripId;
 };
 
-Product.prototype.getPriceAndDistance = function(trip) {
+Product.prototype.getFareAndDistance = function(trip) {
   return maptools
     .getRoute(trip.pickupLocation, trip.dropoffLocation)
     .bind(this)
     .then(function(route){
       return {
         distance: route.distance,
-        price: this.baseCost + (route.distance * this.costPerMile)
+        fare: this.baseCost + (route.distance * this.costPerMile)
       };
     });
 };

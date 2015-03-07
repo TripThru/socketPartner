@@ -7,6 +7,14 @@ module.exports = {
   simulationInterval: 10,
   tripsPerHour: 1500,
   drivers: 100000,
+  currencyCode: 'USD',
+  capacity: 2000,
+  imageUrl: 'http://www.tripthru.com/assets/networks/dididache@tripthru.com.png',
+  acceptsPrescheduled: true,
+  acceptsOndemand: true,
+  acceptsCashPayment: true,
+  acceptsAccountPayment: true,
+  acceptsCreditcardPayment: true,
   coverage: [
        {city: 'Peking', businessPercentage: 98},
        {city: 'Hong Kong', businessPercentage: 2}

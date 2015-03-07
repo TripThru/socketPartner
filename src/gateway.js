@@ -3,14 +3,13 @@ var logger = require('./logger');
 
 var IGateway = new Interface('Gateway', ['getNetworkInfo',
                                          'dispatchTrip',
-                                         'getTrip',
                                          'getTripStatus',
                                          'updateTripStatus',
-                                         'quoteTrip',
-                                         'updateQuote',
                                          'getQuote',
                                          'requestPayment',
-                                         'acceptPayment'
+                                         'acceptPayment',
+                                         'getDriversNearby',
+                                         'getTrip'
                                          ]);
 
 function Gateway(id, name) {
@@ -38,14 +37,6 @@ Gateway.prototype.updateTripStatus = function(request) {
   throw new Error('Not implemented');
 };
 
-Gateway.prototype.quoteTrip = function(request) {
-  throw new Error('Not implemented');
-};
-
-Gateway.prototype.updateQuote = function(request) {
-  throw new Error('Not implemented');
-};
-
 Gateway.prototype.getQuote = function(request) {
   throw new Error('Not implemented');
 };
@@ -55,6 +46,10 @@ Gateway.prototype.requestPayment = function(request) {
 };
 
 Gateway.prototype.acceptPayment = function(request) {
+  throw new Error('Not implemented');
+};
+
+Gateway.prototype.getDriversNearby = function(request) {
   throw new Error('Not implemented');
 };
 

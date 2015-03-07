@@ -12,30 +12,32 @@ var MapToolsError = require('./map_tools').MapToolsError;
 
 function successResponse() {
   return {
-    result: codes.resultCodes.ok,
-    message: 'ok'
+    result_code: codes.resultCodes.ok,
+    result: 'OK'
   };
 }
 
 function failResponse(message, errorCode) {
   return {
-    result: errorCode,
-    message: message
+    result_code: errorCode,
+    result: message
   };
 }
 
 function idName(object) {
-  return {
-    id: object.id || null,
-    name: object.name || null
-  };
+  var o = {};
+  if(object.id) o.id = object.id;
+  if(object.name) o.name = object.name;
+  return o;
 }
 
 function apiLocation(location) {
-  return {
+  var loc = {
     lat: location.lat,
     lng: location.lng
   };
+  if(location.description) loc.description = location.description;
+  return loc;
 }
 
 function getISOStringFromMoment(moment) {
@@ -46,28 +48,42 @@ function getMomentFromISOString(dateString) {
   return moment.utc(dateString, moment.ISO_8601, true);
 }
 
+function guid() {
+  function s4() {
+    return Math.floor((1 + Math.random()) * 0x10000)
+      .toString(16)
+      .substring(1);
+  }
+  return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+    s4() + '-' + s4() + s4() + s4();
+}
+
 function createDispatchRequest(trip, network) {
   var r = {
       id: trip.publicId,
-      clientId: trip.network.id,
-      originatingProduct: idName(trip.product),
-      passenger: idName(trip.passenger),
-      pickupLocation: apiLocation(trip.pickupLocation),
-      pickupTime: getISOStringFromMoment(trip.pickupTime),
-      dropoffLocation: apiLocation(trip.dropoffLocation)
+      client_id: trip.network.id,
+      customer: idName(trip.customer),
+      pickup_location: apiLocation(trip.pickupLocation),
+      pickup_time: getISOStringFromMoment(trip.pickupTime),
+      dropoff_location: apiLocation(trip.dropoffLocation),
+      passengers: 1,
+      luggage: 0,
+      payment_method_code: 'cash'
   };
-  if(trip.vehicleType) r.vehicleType = trip.vehicleType;
-  if(network) { 
-    r.network = idName(network);
-  }
+  if(network) r.network_id = network.id;
   return r;
 }
 
 function createUpdateTripStatusRequest(trip) {
   var r = {
-      id: trip.publicId,
-      clientId: trip.network.id,
-      status: trip.status
+    id: trip.publicId,
+    client_id: trip.network.id,
+    status: trip.status,
+    product: {
+      id: trip.product.id,
+      name: trip.product.name,
+      image_url: trip.product.imageUrl
+    }
   };
   if(trip.eta) r.eta = getISOStringFromMoment(trip.eta);
   if(trip.driver) {
@@ -79,24 +95,22 @@ function createUpdateTripStatusRequest(trip) {
 
 function createGetTripStatusRequest(trip) {
   var r = {
-      id: trip.publicId,
-      clientId: trip.network.id,
+    id: trip.publicId,
+    client_id: trip.network.id,
   };
   return r;
 }
 
 function createTripFromDispatchRequest(request) {
   var trip = {
-      publicId: request.id,
-      passenger: request.passenger,
-      pickupLocation: request.pickupLocation,
-      pickupTime: getMomentFromISOString(request.pickupTime),
-      dropoffLocation: request.dropoffLocation,
+    publicId: request.id,
+    customer: request.customer,
+    pickupLocation: request.pickup_location,
+    pickupTime: getMomentFromISOString(request.pickup_time),
+    dropoffLocation: request.dropoff_location,
   };
-  if(request.product) trip.product = request.product;
-  if(request.driver) trip.driver = request.driver;
-  if(request.vehicleType) trip.vehicleType = request.vehicleType;
-  if(request.network) trip.network = request.network;
+  if(request.product_id) trip.product = idName({ id: request.product_id });
+  if(request.network_id) trip.network = idName({ id: request.network_id });
   return trip;
 }
 
@@ -122,6 +136,13 @@ function createTripFromGetTripStatusRequest(request) {
   return trip;
 }
 
+function createTripFromGetTripRequest(request) {
+  var trip = {
+    publicId: request.id  
+  };
+  return trip;
+}
+
 function createDispatchResponse(trip) {
   return successResponse();
 }
@@ -133,46 +154,44 @@ function createUpdateTripStatusResponse(trip) {
 function createGetTripStatusResponse(trip, network) {
   var r = successResponse();
   r.product = idName(trip.product);
-  r.passenger = idName(trip.passenger);
-  r.pickupLocation = apiLocation(trip.pickupLocation);
-  r.dropoffLocation = apiLocation(trip.dropoffLocation);
-  r.vehicleType = trip.vehicleType;
+  r.product.image_url = trip.product.imageUrl;
+  r.customer = idName(trip.customer);
   r.status = trip.status;
-  if(trip.dropoffTime) r.dropoffTime = getISOStringFromMoment(trip.dropoffTime);
-  if(trip.pickupTime) r.pickupTime = getISOStringFromMoment(trip.pickupTime);
   if(trip.eta) r.eta = getISOStringFromMoment(trip.eta);
-  if(trip.origination === 'local') {
-    r.originatingNetwork = idName({id: network.id, name: network.name});
-    r.servicingNetwork = idName({id: trip.network.id, name: trip.network.name});
-  } else {
-    r.originatingNetwork = idName({id: trip.network.id, name: trip.network.name});
-    r.servicingNetwork = idName({id: network.id, name: network.name});
-  }
-  if(trip.origination === 'foreign') r.servicingNetwork = idName({id: trip.network.id});
-  if(trip.price) r.price = trip.price;
   if(trip.driver) {
     r.driver = idName(trip.driver);
     if(trip.driver.location) r.driver.location = apiLocation(trip.driver.location);
-    if(trip.driver.initialLocation) r.driver.initialLocation = apiLocation(trip.driver.initialLocation);
   }
-  if(trip.distance) r.distance = trip.distance;
-  if(trip.duration) r.duration = trip.duration.asSeconds();
+  return r;
+}
+
+function createGetTripResponse(trip) {
+  var r = successResponse();
+  r.distance = trip.distance;
+  r.fare = trip.fare;
   return r;
 }
 
 function createGetNetworkInfoResponse(products) {
   var response = {
-      products: []
+    id: products[0].network.id,
+    name: products[0].network.name,
+    products: []
   };
-  var vehicleTypesTemp = {};
   for(var i = 0; i < products.length; i++) {
-    var product = idName(products[i]);
-    product.coverage = {
-        center: apiLocation(products[i].coverage.center),
-        radius: products[i].coverage.radius
-    };
-    product.vehicleTypes = products[i].vehicleTypes;
-    response.products.push(product);
+    var product = products[i];
+    response.products.push({
+      id: product.id,
+      name: product.name,
+      image_url: product.imageUrl,
+      capacity: product.capacity,
+      accepts_prescheduled: product.acceptsPrescheduled,
+      accepts_ondemand: product.acceptsOndemand,
+      accepts_cash_payment: product.acceptsCashPayment,
+      accepts_account_payment: product.acceptsAccountPayment,
+      accepts_creditcard_payment: product.acceptsCreditcardPayment,
+      coverage: product.coverage
+    });
   }
   return response;
 }
@@ -211,6 +230,8 @@ function createResponseFromTrip(trip, type, message, errorCode, args) {
         throw new Error('Network arg is required');
       }
       return createGetTripStatusResponse(trip, network);
+    case 'get-trip':
+      return createGetTripResponse(trip);
     default:
       throw new Error('Invalid request type ' + type);
   }
@@ -224,6 +245,8 @@ function createTripFromRequest(trip, type) {
       return createTripFromUpdateTripStatusRequest(trip);
     case 'get-trip-status':
       return createTripFromGetTripStatusRequest(trip);
+    case 'get-trip':
+      return createTripFromGetTripRequest(trip);
     default:
       throw new Error('Invalid request type ' + type);
   }
@@ -238,26 +261,23 @@ function createResponseFromQuoteRequest(request, products) {
 function createTripFromQuoteRequest(request, product) {
   var trip = {
     id: request.id,
-    pickupLocation: request.pickupLocation,
-    pickupTime:  getMomentFromISOString(request.pickupTime),
-    paymentMethod: request.paymentMethod,
-    passenger: request.passenger,
-    dropoffLocation: request.dropoffLocation,
-    vehicleType: request.vehicleType,
-    maxPrice: request.maxPrice,
-    minRating: request.minRating,
     product: product,
-    network: product.network,
-    driver: request.driver
+    pickupLocation: request.pickup_location,
+    pickupTime:  getMomentFromISOString(request.pickup_time),
+    paymentMethod: request.payment_method_code,
+    dropoffLocation: request.dropoff_location
   };
+  if(request.customer_id) {
+    trip.customer = { id: request.customer_id };
+  }
   return trip;
 }
 
 function createPaymentRequestFromTrip(trip) {
   return {
     id: trip.publicId,
-    currencyCode: 'USD',
-    fare: trip.price
+    currency_code: trip.product.currencyCode,
+    fare: trip.fare
   };
 }
 
@@ -280,7 +300,7 @@ function createAcceptPaymentResponseFromAcceptPaymentRequest(request) {
 function createTripFromRequestPaymentRequest(request) {
   return {
     publicId: request.id,
-    price: request.fare
+    fare: request.fare
   };
 }
 
@@ -325,20 +345,33 @@ function createTripFromTripPaymentRequest(request, type) {
 
 function createQuoteFromTrip(trip) {
   var quote = {
-      network: idName(trip.network),
-      product: idName(trip.product),
-      vehicleType: trip.vehicleType
+    id: guid()
   };
-  return trip.product
+  return trip
+    .product
     .getPickupEta(trip)
     .then(function(eta){
       quote.eta = eta;
+      quote.network = {
+        id: trip.product.network.id,
+        name: trip.product.network.name
+      };
+      quote.product = {
+        id: trip.product.id,
+        name: trip.product.name,
+        image_url: trip.product.imageUrl
+      };
       if(trip.dropoffLocation) {
         return trip.product
-          .getPriceAndDistance(trip)
-          .then(function(priceAndDistance){
-            quote.price = priceAndDistance.price;
-            quote.distance = priceAndDistance.distance;
+          .getFareAndDistance(trip)
+          .then(function(fareAndDistance){
+            quote.fare = {
+              low_estimate: 5,
+              high_estimate: 15,
+              currency_code: trip.product.currencyCode
+            };
+            quote.distance = fareAndDistance.distance;
+            quote.duration = 300;
           })
           .catch(MapToolsError, function(err){
             logger.log(trip.id, 'MapToolsError: ' + err.message);
@@ -356,22 +389,16 @@ function createQuoteFromTrip(trip) {
     });
 }
 
-function createUpdateQuoteRequestFromQuoteRequest(request, products) {
+function createResponseFromGetQuoteRequest(request, products) {
   var quotes = [];
   var tasks = [];
   for(var i = 0; i < products.length; i++) {
     var product = products[i];
-    if(!product.servesLocation(request.pickupLocation)) {
+    if(!product.servesLocation(request.pickup_location)) {
       continue;
     }
-    for(var j = 0; j < product.vehicleTypes.length; j++) {
-      var vehicleType = product.vehicleTypes[j];
-      if(!request.vehicleType || request.vehicleType === vehicleType) {
-        var trip = createTripFromQuoteRequest(request, product);
-        trip.vehicleType = vehicleType;
-        tasks.push(trip);
-      }
-    }
+    var trip = createTripFromQuoteRequest(request, product);
+    tasks.push(trip);
   }
   
   // Run in sequence to avoid making too many google maps requests simultaneously
@@ -386,48 +413,20 @@ function createUpdateQuoteRequestFromQuoteRequest(request, products) {
         });
     })
     .then(function(){
-      var updateQuoteRequest = {
-        id: request.id,
-        quotes: quotes
-      };
-      return updateQuoteRequest;
+      var response = successResponse();
+      response.id = request.id;
+      response.quotes = quotes;
+      return response;
     });
 }
 
-function createQuoteFromQuoteRequest(request) {
+function createQuoteFromGetQuoteRequest(request) {
   var quote = {
     id: request.id,
-    request: {
-        clientId: request.clientId,
-        id: request.id,
-        pickupLocation: apiLocation(request.pickupLocation),
-        pickupTime: getMomentFromISOString(request.pickupTime),
-        passenger: idName(request.passenger),
-        dropoffLocation: apiLocation(request.dropoffLocation),
-        vehicleType: request.vehicleType
-    },
+    clientId: request.client_id,
+    request: request,
     receivedQuotes: []
   };
-  return quote;
-}
-
-function createQuoteFromUpdateQuoteRequest(request, quote) {
-  if(request.quotes.length > 0) {
-    for(var i = 0; i < request.quotes.length; i++) {
-      var q = request.quotes[i];
-      var quoteUpdate = {
-          network: idName(q.network),
-          product: idName(q.product),
-          eta: getMomentFromISOString(q.eta),
-          vehicleType: q.vehicleType,
-          price: q.price,
-          distance: q.distance
-      };
-      if(q.duration) quoteUpdate.duration = moment.duration(q.duration, 'seconds');
-      if(q.driver) quoteUpdate.driver = idName(q.driver);
-      quote.receivedQuotes.push(quoteUpdate);
-    }
-  }
   return quote;
 }
 
@@ -440,29 +439,6 @@ function createQuoteFromGetQuoteRequest(request) {
 
 function createQuoteResponseFromQuote(request) {
   return successResponse();
-}
-
-function createGetQuoteResponseFromQuote(quote) {
-  var r = {
-    id: quote.id,
-    clientId: tripthruClientId,
-    quotes: []
-  };
-  for(var i = 0; quote.receivedQuotes.length; i++) {
-    var q = quote.receivedQuotes[i];
-    r.quotes.push({
-      network: idName(q.network),
-      product: idName(q.product),
-      driver: idName(q.driver),
-      passenger: idName(q.passenger),
-      eta: getISOStringFromMoment(q.eta),
-      vehicleType: q.vehicleType,
-      price: q.price,
-      distance: q.distance,
-      duration: q.duration.asSeconds()
-    });
-  }
-  return r;
 }
 
 function createUpdateQuoteResponseFromQuote(quote) {
@@ -531,10 +507,10 @@ module.exports.createRequestFromTrip = createRequestFromTrip;
 module.exports.createResponseFromTrip = createResponseFromTrip;
 module.exports.createTripFromRequest = createTripFromRequest;
 module.exports.createResponseFromQuoteRequest = createResponseFromQuoteRequest;
-module.exports.createUpdateQuoteRequestFromQuoteRequest = createUpdateQuoteRequestFromQuoteRequest;
 module.exports.createRequestFromQuote = createRequestFromQuote;
 module.exports.createResponseFromQuote = createResponseFromQuote;
 module.exports.createQuoteFromRequest = createQuoteFromRequest;
+module.exports.createResponseFromGetQuoteRequest = createResponseFromGetQuoteRequest;
 module.exports.createTripPaymentRequestFromTrip = createTripPaymentRequestFromTrip;
 module.exports.createResponseFromTripPaymentRequest = createResponseFromTripPaymentRequest;
-module.exports.createTripFromTripPaymentRequest = createTripFromTripPaymentRequest
+module.exports.createTripFromTripPaymentRequest = createTripFromTripPaymentRequest;

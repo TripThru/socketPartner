@@ -22,7 +22,7 @@ function Trip(config) {
   if(!config.dropoffLocation) {
     throw new Error('Dropoff location is required');
   }
-  if(!config.passenger) {
+  if(!config.customer) {
     throw new Error('Passenger is required');
   }
   
@@ -34,7 +34,7 @@ function Trip(config) {
   this.network = config.product.network;
   this.status = 'new';
   this.driver = config.driver;
-  this.passenger = config.passenger;
+  this.customer = config.customer;
   this.origination = config.origination;
   this.service = 'local';
   this.luggage = null;
@@ -46,8 +46,8 @@ function Trip(config) {
   this.waypoints = config.waypoints;
   this.paymentMethod = config.paymentMethod || 'cash';
   this.vehicleType = config.vehicleType || 'sedan';
-  this.price = config.price || 0;
-  this.maxPrice = config.maxPrice || 0;
+  this.fare = config.fare || 0;
+  this.maxFare = config.maxFare || 0;
   this.minRating = config.minRating || 0;
   this.autoDispatch = config.autoDispatch === false ? false : true;
   this.lastUpdate = null;
@@ -100,7 +100,7 @@ Trip.prototype.updateStatus = function(notifyNetwork, status, driverLocation, et
       this.duration.add(durationToNextPoint);
     }
     switch(status) {
-      case 'complete':
+      case 'completed':
         logger.log(this.id, 'Trip completed, deactivating');
         promiseToUpdate = 
           promiseToUpdate
@@ -108,10 +108,10 @@ Trip.prototype.updateStatus = function(notifyNetwork, status, driverLocation, et
             .then(function(){
               return this
                 .product
-                .getPriceAndDistance(this)
+                .getFareAndDistance(this)
                 .bind(this)
                 .then(function(result){
-                  this.price = result.price;
+                  this.fare = result.fare;
                 });
             });
           

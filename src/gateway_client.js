@@ -37,20 +37,17 @@ GatewayClient.prototype.setListener = function(listener) {
   }.bind(this));
   
   //Quotes
-  this.socket.on('quote-trip', function(req, cb){
-    this.listener.quoteTrip(req, cb);
-  }.bind(this));
   this.socket.on('get-quote', function(req, cb){
     this.listener.getQuote(req, cb);
-  }.bind(this));
-  this.socket.on('update-quote', function(req, cb){
-    this.listener.updateQuote(req, cb);
   }.bind(this));
   
   //Users
   this.socket.on('get-network-info', function(req ,cb){
     this.listener.getNetworkInfo(req, cb);
   }.bind(this));
+  this.socket.on('get-drivers-nearby', function(req, cb){
+    this.listener.getDriversNearby(req, cb);
+  });
 };
 
 GatewayClient.prototype.open = function(url, token, cb) {
@@ -81,7 +78,7 @@ GatewayClient.prototype.open = function(url, token, cb) {
 
 GatewayClient.prototype.emit = function(action, request) {
   var self = this;
-  request.clientId = this.clientId;
+  request.client_id = this.clientId;
   return new Promise(function(resolve, reject){
     self.socket.emit(action, request, function(res){
       logger.log(self.listener.id, 'Emitted ' + action + ' ' + request.id + ', res: ' + res.result);
@@ -122,16 +119,12 @@ GatewayClient.prototype.acceptPayment = function(request) {
   return this.emit('accept-payment', request);
 };
 
-GatewayClient.prototype.quoteTrip = function(request) {
-  return this.emit('quote-trip', request);
-};
-
-GatewayClient.prototype.updateQuote = function(request) {
-  return this.emit('update-quote', request);
-};
-
 GatewayClient.prototype.getQuote = function(request) {
   return this.emit('get-quote', request);
+};
+
+GatewayClient.prototype.getDriversNearby = function(request) {
+  return this.emit('get-drivers-nearby', request);
 };
 
 module.exports = GatewayClient;

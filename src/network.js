@@ -1,8 +1,8 @@
 var Gateway = require('./gateway').Gateway;
 var IGateway = require('./gateway').IGateway;
 var Interface = require('./interface').Interface;
-var IFleet = require('./fleet').IFleet;
-var Fleet = require('./fleet').Fleet;
+var IProduct = require('./product').IProduct;
+var Product = require('./product').Product;
 var logger = require('./logger');
 var trips = require('./models/trips');
 var quotes = require('./models/quotes');
@@ -24,23 +24,23 @@ function Network(config) {
   if(!config.gatewayClient) {
     throw new Error('GatewayClient instance is required');
   }
-  if(!config.fleets || config.fleets.length === 0) {
-    throw new Error('At least one fleet is required');
+  if(!config.products || config.products.length === 0) {
+    throw new Error('At least one product is required');
   }
   
   Gateway.call(this, config.id, config.name);
   Interface.ensureImplements(config.gatewayClient, IGateway);
-  for(var i = 0; i < config.fleets.length; i++) {
-    Interface.ensureImplements(config.fleets[i], IFleet);
+  for(var i = 0; i < config.products.length; i++) {
+    Interface.ensureImplements(config.products[i], IProduct);
   }
   
   this.gatewayClient = config.gatewayClient;
-  this.fleets = config.fleets;
-  this.fleetsById = {};
-  for(var j = 0; j < config.fleets.length; j++) {
-    var fleet = config.fleets[j];
-    this.fleetsById[fleet.id] = fleet;
-    fleet.setNetwork(this);
+  this.products = config.products;
+  this.productsById = {};
+  for(var j = 0; j < config.products.length; j++) {
+    var product = config.products[j];
+    this.productsById[product.id] = product;
+    product.setNetwork(this);
   }
   this.preferedNetworkId = config.preferedNetworkId;
   this.activeTripsByPublicId = {};
@@ -48,11 +48,11 @@ function Network(config) {
 }
 
 Network.prototype.getNetworkInfo = function(request, cb) {
-  cb(TripThruApiFactory.createGetNetworkInfoResponse(this.fleets));
+  cb(TripThruApiFactory.createGetNetworkInfoResponse(this.products));
 };
 
 Network.prototype.setNetworkInfoAtTripThru = function(cb) {
-  var request = TripThruApiFactory.createGetNetworkInfoResponse(this.fleets);
+  var request = TripThruApiFactory.createGetNetworkInfoResponse(this.products);
   this
     .gatewayClient
     .setNetworkInfo(request)
@@ -73,10 +73,10 @@ Network.prototype.dispatchTrip = function(request, cb) {
   var dispatchPromise;
   if (trip.driver && trip.driver.id) {
     dispatchPromise = this.dispatchToSpecificDriver(trip);
-  } else if(trip.fleet && trip.fleet.id) {
-    dispatchPromise = this.dispatchToSpecificFleet(trip);
+  } else if(trip.product && trip.product.id) {
+    dispatchPromise = this.dispatchToSpecificProduct(trip);
   } else {
-    dispatchPromise = this.dispatchToFirstFleetThatServes(trip);
+    dispatchPromise = this.dispatchToFirstProductThatServes(trip);
   }
   
   dispatchPromise
@@ -102,31 +102,31 @@ Network.prototype.dispatchToSpecificDriver = function(trip) {
   throw new Error('Not implemented');
 };
 
-Network.prototype.dispatchToSpecificFleet = function(trip) {
-  logger.log(trip.publicId, 'Dispatching to fleet ' + trip.fleet.id);
-  var fleet = this.fleetsById[trip.fleet.id];
+Network.prototype.dispatchToSpecificProduct = function(trip) {
+  logger.log(trip.publicId, 'Dispatching to product ' + trip.product.id);
+  var product = this.productsById[trip.product.id];
   
-  if(fleet && fleet.servesLocation(trip.pickupLocation)) {
-    var t = fleet.createTrip(trip.passenger, trip.pickupTime, trip.pickupLocation, 
+  if(product && product.servesLocation(trip.pickupLocation)) {
+    var t = product.createTrip(trip.customer, trip.pickupTime, trip.pickupLocation, 
           trip.dropoffLocation, trip.publicId);
-    if(fleet.queueTrip(t)) {
+    if(product.queueTrip(t)) {
       return Promise.resolve(t);
     }
   }
   return Promise.resolve(null);
 };
 
-Network.prototype.dispatchToFirstFleetThatServes = function(trip) {
-  logger.log(trip.publicId, 'Dispatching to first fleet that serves');
-  for(var i = 0; i < this.fleets.length; i++) {
-    var fleet = this.fleets[i];
-    if(fleet.servesLocation(trip.pickupLocation)) {
-      trip.fleet = { id: fleet.id, name: fleet.name };
+Network.prototype.dispatchToFirstProductThatServes = function(trip) {
+  logger.log(trip.publicId, 'Dispatching to first product that serves');
+  for(var i = 0; i < this.products.length; i++) {
+    var product = this.products[i];
+    if(product.servesLocation(trip.pickupLocation)) {
+      trip.product = { id: product.id, name: product.name };
       break;
     }
   }
-  if(trip.fleet) {
-    return this.dispatchToSpecificFleet(trip);
+  if(trip.product) {
+    return this.dispatchToSpecificProduct(trip);
   }
   Promise.resolve(null);
 };
@@ -148,7 +148,6 @@ Network.prototype.getTripStatus = function(request, cb) {
 
 Network.prototype.updateTripStatus = function(request, cb) {
   var trip = TripThruApiFactory.createTripFromRequest(request, 'update-trip-status');
-  
   if(!this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
     cb(TripThruApiFactory.createResponseFromTrip(null, null, 
         'Not found', resultCodes.notFound));
@@ -165,6 +164,17 @@ Network.prototype.updateTripStatus = function(request, cb) {
 };
 
 Network.prototype.getTrip = function(request, cb) {
+  var trip = TripThruApiFactory.createTripFromRequest(request, 'get-trip');
+  if(!this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
+    cb(TripThruApiFactory.createResponseFromTrip(null, null, 
+        'Not found', resultCodes.notFound));
+    return;
+  }
+  var t = this.activeTripsByPublicId[trip.publicId];
+  cb(TripThruApiFactory.createResponseFromTrip(t, 'get-trip'));
+};
+
+Network.prototype.getDriversNearby = function(request, cb) {
   throw new Error('Not implemented');
 };
 
@@ -205,52 +215,25 @@ Network.prototype.acceptPayment = function(request, cb) {
   cb(response);
 };
 
-Network.prototype.quoteTrip = function(request, cb) {
-  logger.log(request.id, this.id + ' received quotetrip');
-  cb(TripThruApiFactory.createResponseFromQuoteRequest(request));
-  
-  TripThruApiFactory
-    .createUpdateQuoteRequestFromQuoteRequest(request, this.fleets)
-    .bind(this)
-    .delay(100)
-    .then(function(updateQuoteRequest){
-      this.gatewayClient.updateQuote(updateQuoteRequest);
-    });
-};
-
-Network.prototype.updateQuote = function(request, cb) {
-  logger.log(request.id, this.id + ' received quote update');
-  quotes
-    .getById(request.id)
-    .bind({})
-    .then(function(q){
-      if(q) {
-        this.quote = q;
-        var networkQuote = TripThruApiFactory.createQuoteFromRequest(request, 
-            'update', {quote: q});
-        return quotes.update(this.quote);
-      }
-      throw new Error('Quote not found');
-    })
-    .then(function(){
-      var response = TripThruApiFactory.createResponseFromQuote(this.quote, 'update');
-      cb(response);
-    })
-    .error(function(err){
-      var response = TripThruApiFactory.createResponseFromQuote(null, null, 
-          resultCodes.unknownError, 'unknown error ocurred');
-      cb(response);
-    });
-};
-
 Network.prototype.getQuote = function(request, cb) {
-  throw new Error('Not implemented');
+  logger.log(request.id, this.id + ' received getQuote');
+  TripThruApiFactory
+    .createResponseFromGetQuoteRequest(request, this.products)
+    .then(function(updateQuoteRequest){
+      cb(updateQuoteRequest);
+    });
 };
 
 Network.prototype.update = function() {
-  return PromiseHelper.runInSequence(this.fleets, function(fleet){
-    return fleet.simulate();
+  return PromiseHelper.runInSequence(this.products, function(product){
+    return product.simulate();
   });
+};
+
+Network.prototype.sendPaymentRequestToTripThru = function(trip) {
+  var paymentRequest = 
+    TripThruApiFactory.createTripPaymentRequestFromTrip(trip, 'request-payment');
+  this.gatewayClient.requestPayment(paymentRequest);
 };
 
 Network.prototype.tryToCreateLocalTripAtTripThru = function(trip) {
@@ -267,7 +250,7 @@ Network.prototype.tryToDispatchToForeignProvider = function(trip, networkId) {
     .dispatchTrip(request)
     .bind(this)
     .then(function(response){
-      var success = response.result === resultCodes.ok;
+      var success = response.result_code === resultCodes.ok;
       if(success) {
         if(networkId === this.id) {
           logger.log(trip.id, 'Local trip was created in TripThru');
@@ -280,12 +263,6 @@ Network.prototype.tryToDispatchToForeignProvider = function(trip, networkId) {
       }
       return success;
     });
-};
-
-Network.prototype.sendPaymentRequestToTripThru = function(trip) {
-  var paymentRequest = 
-    TripThruApiFactory.createTripPaymentRequestFromTrip(trip, 'request-payment');
-  this.gatewayClient.requestPayment(paymentRequest);
 };
 
 Network.prototype.addTrip = function(trip) {
@@ -321,24 +298,7 @@ Network.prototype.bookingsQuoteTrip = function(request, cb) {
       return this.gatewayClient.quoteTrip(request);
     })
     .then(function(res){
-       if(res.result !== resultCodes.ok) {
-         cb(res);
-         return;
-       }
-       return TripThruApiFactory
-         .createUpdateQuoteRequestFromQuoteRequest(request, this.fleets)
-         .delay(6000) //wait to receive quote update from tripthru
-         .then(function(res){
-           quotes
-             .getById(quote.id)
-             .then(function(q){
-               for(var i = 0; i < q.receivedQuotes.length; i++) {
-                 res.quotes.push(q.receivedQuotes[i]);
-               }
-               res.result = resultCodes.ok;
-               cb(res);
-             });
-         });
+      cb(res);
     })
     .error(function(err){
       var response = TripThruApiFactory.createResponseFromQuote(null, null, 
@@ -375,7 +335,7 @@ Network.prototype.bookingsDispatchTrip = function(request, cb) {
   var trip = TripThruApiFactory.createTripFromRequest(request, 'dispatch');
   if(request.network.id === this.id) {
     this
-      .dispatchToFirstFleetThatServes(trip)
+      .dispatchToFirstProductThatServes(trip)
       .then(function(t){
         if(t) {
           t.origination = 'local';
@@ -391,12 +351,12 @@ Network.prototype.bookingsDispatchTrip = function(request, cb) {
               'Dispatch failed', resultCodes.rejected));
       });
   } else {
-    var fleet = this.fleets[0];
-    var t = fleet.createTrip(trip.passenger, trip.pickupTime, trip.pickupLocation, 
+    var product = this.products[0];
+    var t = product.createTrip(trip.customer, trip.pickupTime, trip.pickupLocation, 
         trip.dropoffLocation, trip.publicId);
     t.origination = 'local';
     t.service = 'foreign';
-    if(!fleet.queueTrip(t)) {
+    if(!product.queueTrip(t)) {
       cb(TripThruApiFactory.createResponseFromTrip(null, null, 
           'Dispatch unsuccessful', resultCodes.rejected));
     } else {
