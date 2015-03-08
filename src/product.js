@@ -308,9 +308,8 @@ Product.prototype.dispatch = function(trip) {
           .network
           .tryToDispatchToForeignProvider(trip)
           .then(function(success){
-            if(success) {
-              return trip.updateStatus(false, 'accepted');
-            }
+            var status = success ? 'accepted' : 'rejected';
+            return trip.updateStatus(false, status);
           });
       }
     });
