@@ -130,7 +130,6 @@ Trip.prototype.updateStatus = function(notifyNetwork, status, driverLocation, et
         }*/
         if(this.origination === 'foreign') {
           this.network.deactivateTrip(this, status);
-          notifyNetwork = true;
         }
         break;
     }
