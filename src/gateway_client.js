@@ -4,6 +4,8 @@ var Gateway = require('./gateway').Gateway;
 var IGateway = require('./gateway').IGateway;
 var Interface = require('./interface').Interface;
 var logger = require('./logger');
+var codes = require('./codes');
+var resultCodes = codes.resultCodes;
 
 function GatewayClient(id, name, clientId) {
   Gateway.call(this, id, name);
@@ -81,7 +83,12 @@ GatewayClient.prototype.emit = function(action, request) {
   request.client_id = this.clientId;
   return new Promise(function(resolve, reject){
     self.socket.emit(action, request, function(res){
-      logger.log(self.listener.id, 'Emitted ' + action + ' ' + request.id + ', res: ' + res.result);
+      if(!res) {
+        res = {
+          result_code: resultCodes.unknownError
+        };
+      }
+      logger.log(self.listener.id, 'Emitted ' + action + ' ' + request.id + ', res: ' + res.result_code);
       resolve(res);
     });
   });
