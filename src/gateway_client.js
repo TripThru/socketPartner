@@ -20,35 +20,35 @@ GatewayClient.prototype.setListener = function(listener) {
   
   //Trips
   this.socket.on('dispatch-trip', function(req, cb){
-    this.listener.dispatchTrip(req, cb);
+    this.listener.dispatchTrip(req).then(cb);
   }.bind(this));
   this.socket.on('get-trip', function(req, cb){
-    this.listener.getTrip(req, cb);
+    this.listener.getTrip(req).then(cb);
   }.bind(this));
   this.socket.on('get-trip-status', function(req, cb){
-    this.listener.getTripStatus(req, cb);
+    this.listener.getTripStatus(req).then(cb);
   }.bind(this));
   this.socket.on('update-trip-status', function(req, cb){
-    this.listener.updateTripStatus(req, cb);
+    this.listener.updateTripStatus(req).then(cb);
   }.bind(this));
   this.socket.on('request-payment', function(req, cb){
-    this.listener.requestPayment(req, cb);
+    this.listener.requestPayment(req).then(cb);
   }.bind(this));
   this.socket.on('accept-payment', function(req, cb){
-    this.listener.acceptPayment(req, cb);
+    this.listener.acceptPayment(req).then(cb);
   }.bind(this));
   
   //Quotes
   this.socket.on('get-quote', function(req, cb){
-    this.listener.getQuote(req, cb);
+    this.listener.getQuote(req).then(cb);
   }.bind(this));
   
   //Users
   this.socket.on('get-network-info', function(req ,cb){
-    this.listener.getNetworkInfo(req, cb);
+    this.listener.getNetworkInfo(req).then(cb);
   }.bind(this));
   this.socket.on('get-drivers-nearby', function(req, cb){
-    this.listener.getDriversNearby(req, cb);
+    this.listener.getDriversNearby(req).then(cb);
   });
 };
 

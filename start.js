@@ -42,11 +42,13 @@ function runOneNetwork(name) {
     client.setListener(network);
     if(!started.hasOwnProperty(name)){
       started[name] = true;
-      network.setNetworkInfoAtTripThru(function(){
-        setTimeout(function(){
-          start(network, simulationInterval);
-        }, 5000);
-      });
+      network
+        .setNetworkInfoAtTripThru()
+        .then(function(){
+          setTimeout(function(){
+            start(network, simulationInterval);
+          }, 5000);
+        });
     }
   });
   

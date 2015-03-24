@@ -26,21 +26,27 @@ function init(networksById) {
       var network = networksById[id];
       app.post('/' + name + '/quote', function(req, res){   
         var request = req.body;
-        network.bookingsQuoteTrip(request, function(response){
-          res.json(response);
-        });
+        network
+          .bookingsQuoteTrip(request)
+          .then(function(response){
+            res.json(response);
+          });
       });
       app.post('/' + name + '/trip',  function(req, res){
         var request = req.body;
-        network.bookingsDispatchTrip(request, function(response){
-          res.json(response);
-        });
+        network
+          .bookingsDispatchTrip(request)
+          .then(function(response){
+            res.json(response);
+          });
       }); 
       app.get('/' + name + '/tripstatus/:tripId', function(req, res) {
         var request = { id: req.params.tripId };
-        network.bookingsGetTripStatus(request, function(response){
-          res.json(response);
-        });
+        network
+          .bookingsGetTripStatus(request)
+          .then(function(response){
+            res.json(response);
+          });
       });
     })(id);
   }
