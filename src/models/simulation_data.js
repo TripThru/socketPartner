@@ -20,14 +20,13 @@ function getRandomName() {
 }
 
 function getRandomFarmedOutTrip(networkProducts) {
-  if(!tripsByCity.hasOwnProperty(cityName)) {
-    throw new Error('Unknown city ' + cityName);
-  }
   var coveredCities = {};
   for(var i = 0; i < networkProducts.length; i++) {
-    coveredCities[networkProducts[i].city] = 0;
+    if(networkProducts[i].city) {
+      coveredCities[networkProducts[i].city] = 0;
+    }
   }
-  var randomCity = networkProducts[0].city;
+  var randomCity = networkProducts[0].city || cityNames[Math.floor(Math.random()*cityNames.length)];
   while(coveredCities.hasOwnProperty(randomCity)) {
     randomCity = cityNames[Math.floor(Math.random()*cityNames.length)];  
   }

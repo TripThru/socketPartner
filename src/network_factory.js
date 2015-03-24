@@ -8,6 +8,31 @@ function NetworkFactory() {
 
 NetworkFactory.prototype.createNetwork = function(gatewayClient, configuration) {
   var products = [];
+  if(configuration.coverage.length <= 0) {
+    var maxActiveTrips = Math.floor(configuration.tripsPerHour*0.3);
+    products = [new Product({
+      id: configuration.name,
+      name: configuration.name,
+      currencyCode: configuration.currencyCode,
+      capacity: configuration.capacity,
+      imageUrl: configuration.imageUrl,
+      acceptsPrescheduled: configuration.acceptsPrescheduled,
+      acceptsOndemand: configuration.acceptsOndemand,
+      acceptsCashPayment: configuration.acceptsCashPayment,
+      acceptsAccountPayment: configuration.acceptsAccountPayment,
+      acceptsCreditcardPayment: configuration.acceptsCreditcardPayment,
+      city: null,
+      baseCost: 3,
+      costPerMile: 3,
+      tripsPerHour: configuration.tripsPerHour,
+      maxActiveTrips: maxActiveTrips > 0 ? maxActiveTrips : 1,
+      coverage: null,
+      location: null,
+      vehicleTypes: ['compact', 'sedan'],
+      maxDrivers: configuration.drivers,
+      simulationInterval: configuration.simulationInterval
+    })];
+  }
   for(var i = 0; i < configuration.coverage.length; i++) {
     var coverage = configuration.coverage[i];
     var name = configuration.name + ' ' + coverage.city;

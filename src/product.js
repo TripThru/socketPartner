@@ -19,15 +19,6 @@ function Product(config) {
   if(!config.name) {
     throw new Error('Name is required');
   }
-  if(!config.city) {
-    throw new Error('City is required');
-  }
-  if(!config.location) {
-    throw new Error('Location is required');
-  }
-  if(!config.coverage || !config.coverage.center || !config.coverage.radius) {
-    throw new Error('Coverage is required');
-  }
   if(!config.maxDrivers) {
     throw new Error('Max drivers number is required');
   }
@@ -58,26 +49,28 @@ function Product(config) {
   if(!config.imageUrl) {
     throw new Error('Image url is required');
   }
-  if(!config.acceptsPrescheduled) {
+  if(config.acceptsPrescheduled === null) {
     throw new Error('Accepts prescheduled is required');
   }
-  if(!config.acceptsOndemand) {
+  if(config.acceptsOndemand === null) {
     throw new Error('Accepts ondemand is required');
   }
-  if(!config.acceptsCashPayment) {
+  if(config.acceptsCashPayment === null) {
     throw new Error('Accepts cash payment is required');
   }
-  if(!config.acceptsAccountPayment) {
+  if(config.acceptsAccountPayment === null) {
     throw new Error('Accepts account payment is required');
   }
-  if(!config.acceptsCreditcardPayment) {
+  if(config.acceptsCreditcardPayment === null) {
     throw new Error('Accepts creditcard payment is required');
   }
   
   this.id = config.id.replace(/ /g, '');
   this.name = config.name;
   this.city = config.city;
-  this.location = new Location(config.location.lat, config.location.lng);
+  if(config.location) {
+    this.location = new Location(config.location.lat, config.location.lng);
+  }
   this.coverage = config.coverage;
   this.vehicleTypes = config.vehicleTypes;
   this.costPerMile = config.costPerMile;
@@ -127,11 +120,12 @@ Product.prototype.createDriver = function() {
     product: this,
     location: this.location
   };
-  return this.drivers[driver.id] = driver;
+  this.drivers[driver.name] = driver;
+  return driver;
 };
 
 Product.prototype.deleteDriver = function(driver) {
-  delete this.drivers[driver.id];
+  delete this.drivers[driver.name];
 };
 
 Product.prototype.maxDriversReached = function() {
@@ -360,7 +354,7 @@ Product.prototype.tryDispatchLocally = function(trip) {
 };
 
 Product.prototype.servesLocation = function(location) {
-  return maptools.isInside(location, this.coverage);
+  return this.coverage && maptools.isInside(location, this.coverage);
 };
 
 Product.prototype.dispatchToFirstAvailableDriver = function(trip) {
@@ -372,7 +366,7 @@ Product.prototype.dispatchToFirstAvailableDriver = function(trip) {
   if(!trip.driver) {
     throw new Error('Invalid condition: driver is not defined');
   } 
-  logger.log(trip.id, 'Dispatched to: ' + trip.driver.id);
+  logger.log(trip.id, 'Dispatched to: ' + trip.driver.name);
 };
 
 Product.prototype.processStatusDispatched = function(trip) {

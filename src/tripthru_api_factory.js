@@ -180,7 +180,7 @@ function createGetNetworkInfoResponse(products) {
   };
   for(var i = 0; i < products.length; i++) {
     var product = products[i];
-    response.products.push({
+    var p = {
       id: product.id,
       name: product.name,
       image_url: product.imageUrl,
@@ -189,9 +189,12 @@ function createGetNetworkInfoResponse(products) {
       accepts_ondemand: product.acceptsOndemand,
       accepts_cash_payment: product.acceptsCashPayment,
       accepts_account_payment: product.acceptsAccountPayment,
-      accepts_creditcard_payment: product.acceptsCreditcardPayment,
-      coverage: product.coverage
-    });
+      accepts_creditcard_payment: product.acceptsCreditcardPayment
+    };
+    if(product.coverage) { 
+      p.coverage = product.coverage;
+    }
+    response.products.push(p);
   }
   return response;
 }
