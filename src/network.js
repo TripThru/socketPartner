@@ -272,15 +272,17 @@ Network.prototype.updateForeignNetwork = function(trip) {
   return this.gatewayClient.updateTripStatus(request);
 };
 
-//This are helper function used only by the bookings website, to simulate a sync
-//quoting process simplifying the bookings website adaptation to the Node api
+//This are helper functions used only by the bookings website
 
 Network.prototype.bookingsQuoteTrip = function(request) {
-  var quote = TripThruApiFactory.createResponseFromGetQuoteRequest(request);
+  var quote = TripThruApiFactory.createResponseFromGetQuoteRequest(request, this.products);
   return this.
     gatewayClient
-    .quoteTrip(request)
+    .getQuote(request)
     .then(function(res){
+      if(quote && quote.length > 0) {
+        res.quotes = res.quotes.concat(quote.quotes);
+      }
       return res;
     })
     .error(function(err){
@@ -341,7 +343,7 @@ Network.prototype.bookingsDispatchTrip = function(request, cb) {
       return this
         .tryToDispatchToForeignProvider(t, request.network.id)
         .then(function(success){
-          t.updateStatus(false, 'dispatched');
+          t.updateStatus(false, 'accepted');
           return TripThruApiFactory.createResponseFromTrip(t, 'dispatch');
         });
     }
