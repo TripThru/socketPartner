@@ -610,20 +610,17 @@ Product.prototype.getFareAndDistance = function(trip) {
     });
 };
 
-Product.prototype.getPickupEta = function(trip) {
-  var startLocation;
+Product.prototype.getPickupEta = function(startLocation, pickupLocation, pickupTime, delayIfNoDrivers) {
   var delay; 
-  if(this.maxDriversReached()) {
-    startLocation = this.location;
+  if(delayIfNoDrivers && this.maxDriversReached()) {
     delay = this.expectedDelayWhenNoDriversAvailable;
   } else {
-    startLocation = this.location;
     delay = moment.duration(0, 'seconds');
   }
   return maptools
-    .getRoute(startLocation, trip.pickupLocation)
+    .getRoute(startLocation, pickupLocation)
     .then(function(route){
-      return trip.pickupTime.add(route.duration.add(delay));
+      return pickupTime.add(route.duration.add(delay));
     });
 };
 

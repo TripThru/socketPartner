@@ -32,6 +32,14 @@ function init(networksById) {
             res.json(response);
           });
       });
+      app.post('/' + name + '/drivers', function(req, res) {
+        var request = req.body;
+        network
+          .bookingsGetDriversNearby(request)
+          .then(function(response){
+            res.json(response);
+          });
+      });
       app.post('/' + name + '/trip',  function(req, res){
         var request = req.body;
         network

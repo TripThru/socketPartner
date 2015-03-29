@@ -49,7 +49,7 @@ GatewayClient.prototype.setListener = function(listener) {
   }.bind(this));
   this.socket.on('get-drivers-nearby', function(req, cb){
     this.listener.getDriversNearby(req).then(cb);
-  });
+  }.bind(this));
 };
 
 GatewayClient.prototype.open = function(url, token, cb) {

@@ -3,6 +3,7 @@ var codes = require('./codes');
 var logger = require('./logger');
 var resultCodes = codes.resultCodes;
 var PromiseHelper = require('./promise_helper');
+var maptools = require('./map_tools').MapTools;
 var MapToolsError = require('./map_tools').MapToolsError;
 
 // This module transforms incoming requests into inner structures known to the 
@@ -352,7 +353,7 @@ function createQuoteFromTrip(trip) {
   };
   return trip
     .product
-    .getPickupEta(trip)
+    .getPickupEta(trip.product.location, trip.pickupLocation, trip.pickupTime, true)
     .then(function(eta){
       quote.eta = eta;
       quote.network = {
@@ -505,6 +506,66 @@ function createQuoteFromRequest(quote, type, args) {
   }
 }
 
+function createDriversNearbyResponse(request, products) {
+  return new Promise(function(resolve, reject){
+    var coverage = {
+      center: {
+        lat: request.location.lat,
+        lng: request.location.lng
+      },
+      radius: request.radius || 0.1
+    };
+    var limit = request.limit || 10;
+    var productId = request.product_id || null;
+    var drivers = [];
+    for(var i = 0; i < products.length && drivers.length < limit; i++) {
+      var product = products[i];
+      if((!productId || productId === product.id) && product.servesLocation(request.location)) {
+        if(maptools.isInside(product.location, coverage)) {
+          var driver = product.createDriver();
+          if(driver) {
+            drivers.push(driver);
+            product.deleteDriver(driver);
+          }
+        }
+        for(var j = 0; j < product.returningDrivers.length && drivers.length < limit; j++) {
+          var driver = product.returningDrivers[j];
+          if(driver.location && maptools.isInside(driver.location, coverage)) {
+            drivers.push(driver);
+          }
+        }
+      }
+    }
+    var response = {
+      drivers: []
+    };
+    PromiseHelper
+      .runInSequence(drivers, function(driver){
+        return driver
+          .product
+          .getPickupEta(driver.location, request.location, moment(), false)
+          .then(function(pickupEta){
+            response.drivers.push({
+              lat: driver.location.lat,
+              lng: driver.location.lng,
+              eta: getISOStringFromMoment(pickupEta),
+              product: {
+                id: driver.product.id,
+                name: driver.product.name,
+                image_url: driver.product.image_url
+              }
+            });
+          });
+      })
+      .then(function(){
+        var r = successResponse();
+        r.count = response.drivers.length;
+        r.drivers = response.drivers;
+        resolve(r);
+      });
+  });
+}
+
 module.exports.createGetNetworkInfoResponse = createGetNetworkInfoResponse;
 module.exports.createRequestFromTrip = createRequestFromTrip;
 module.exports.createResponseFromTrip = createResponseFromTrip;
@@ -517,3 +578,4 @@ module.exports.createResponseFromGetQuoteRequest = createResponseFromGetQuoteReq
 module.exports.createTripPaymentRequestFromTrip = createTripPaymentRequestFromTrip;
 module.exports.createResponseFromTripPaymentRequest = createResponseFromTripPaymentRequest;
 module.exports.createTripFromTripPaymentRequest = createTripFromTripPaymentRequest;
+module.exports.createDriversNearbyResponse = createDriversNearbyResponse;

@@ -143,9 +143,8 @@ Network.prototype.getTripStatus = function(request) {
 Network.prototype.updateTripStatus = function(request) {
   var trip = TripThruApiFactory.createTripFromRequest(request, 'update-trip-status');
   if(!this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
-    cb(TripThruApiFactory.createResponseFromTrip(null, null, 
+    return Promise.resolve(TripThruApiFactory.createResponseFromTrip(null, null, 
         'Not found', resultCodes.notFound));
-    return;
   }
   var t = this.activeTripsByPublicId[trip.publicId];
   var driverLocation;
@@ -160,16 +159,15 @@ Network.prototype.updateTripStatus = function(request) {
 Network.prototype.getTrip = function(request) {
   var trip = TripThruApiFactory.createTripFromRequest(request, 'get-trip');
   if(!this.activeTripsByPublicId.hasOwnProperty(trip.publicId)) {
-    cb(TripThruApiFactory.createResponseFromTrip(null, null, 
+    return Promise.resolve(TripThruApiFactory.createResponseFromTrip(null, null, 
         'Not found', resultCodes.notFound));
-    return;
   }
   var t = this.activeTripsByPublicId[trip.publicId];
   return Promise.resolve(TripThruApiFactory.createResponseFromTrip(t, 'get-trip'));
 };
 
 Network.prototype.getDriversNearby = function(request) {
-  throw new Error('Not implemented');
+  return TripThruApiFactory.createDriversNearbyResponse(request, this.products);
 };
 
 Network.prototype.requestPayment = function(request) {
@@ -204,7 +202,7 @@ Network.prototype.acceptPayment = function(request) {
         'Not found', resultCodes.notFound));
   }
   var response = 
-    TripThruApiFactory.createResponseFromTripPaymentRequest(request, 'accept-payment')
+    TripThruApiFactory.createResponseFromTripPaymentRequest(request, 'accept-payment');
   return Promise.resolve(response);
 };
 
@@ -290,6 +288,10 @@ Network.prototype.bookingsQuoteTrip = function(request) {
           resultCodes.unknownError, 'unknown error ocurred');
       return response;
     });
+};
+
+Network.prototype.bookingsGetDriversNearby = function(request) {
+  return this.gatewayClient.getDriversNearby(request);
 };
 
 Network.prototype.bookingsGetTripStatus = function(request) {
