@@ -235,6 +235,8 @@ Product.prototype.processTrip = function(trip) {
     case 'picked_up':
       promise = this.processStatusPickedUp(trip);
       break;
+    case 'arrived':
+    case 'dropped_off':
     case 'booking':
       //special case for trips created through booking website accepted
       //to foreign provider
@@ -248,7 +250,7 @@ Product.prototype.processTrip = function(trip) {
   }
   // Handle promise rejection here to avoid breaking the process trip chain
   if(promise) {
-    promise
+    return promise
       .catch(MapToolsError, function(err){
         logger.log(trip.id, 'MapToolsError: ' + err.message);
       })
@@ -585,9 +587,18 @@ Product.prototype.driverUpdateIntervalReached = function(driver) {
     moment().isAfter(moment(driver.lastUpdate).add(this.updateInterval));
 };
 
+Product.prototype.generateUniqueId = function() {
+  function s4() {
+    return Math.floor((1 + Math.random()) * 0x10000)
+      .toString(16)
+      .substring(1);
+  }
+  return s4() + s4();
+};
+
 Product.prototype.generateTripId = function() {
-  this.nextId++;
-  return this.generatePrivateId(this.nextId + '@' + this.tripsId);
+  var id = this.generateUniqueId();
+  return this.generatePrivateId(id + '@' + this.tripsId);
 };
 
 Product.prototype.generateTripPublicId = function(tripId) {
@@ -603,10 +614,12 @@ Product.prototype.getFareAndDistance = function(trip) {
     .getRoute(trip.pickupLocation, trip.dropoffLocation)
     .bind(this)
     .then(function(route){
-      return {
+      var response = {
         distance: route.distance,
         fare: this.baseCost + (route.distance * this.costPerMile)
       };
+      response.fare = response.fare.toFixed(2);
+      return response;
     });
 };
 
