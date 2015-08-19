@@ -6,7 +6,7 @@ var codes = require('./src/codes');
 var resultCodes = codes.resultCodes;
 
 var app = express();
-app.set('port', process.env.PORT || config.port);
+app.set('port', config.expressPort);
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
 app.use(bodyParser.text());
@@ -19,46 +19,86 @@ app.all('*', function(req, res, next){
   next();
 });
 
-function init(networksById) { 
+function init(networksById) {
   for(var id in networksById) {
     (function(id){
       var name = networksById[id].name.replace(/ /g, '');
       var network = networksById[id];
-      app.post('/' + name + '/quote', function(req, res){   
+      var root = '/' + name;
+      app.get(root + '/network/:id', function(req, res){
         var request = req.body;
+        request.id = req.params.id;
         network
-          .bookingsQuoteTrip(request)
+          .getNetworkInfo(request)
           .then(function(response){
             res.json(response);
           });
       });
-      app.post('/' + name + '/drivers', function(req, res) {
-        var request = req.body;
+      app.get(root + '/drivers', function(req, res){
         network
-          .bookingsGetDriversNearby(request)
+          .getDriversNearby(req.body)
           .then(function(response){
             res.json(response);
           });
       });
-      app.post('/' + name + '/trip',  function(req, res){
+      app.get(root + '/quote/:id', function(req, res){
         var request = req.body;
+        request.id = req.params.id;
         network
-          .bookingsDispatchTrip(request)
+          .getQuote(request)
           .then(function(response){
             res.json(response);
           });
-      }); 
-      app.get('/' + name + '/tripstatus/:tripId', function(req, res) {
-        var request = { id: req.params.tripId };
+      });
+      app.post(root + '/trip/:id', function(req, res){
+        var request = req.body;
+        request.id = req.params.id;
         network
-          .bookingsGetTripStatus(request)
+          .dispatchTrip(request)
+          .then(function(response){
+            res.json(response);
+          });
+      });
+      app.put(root + '/tripstatus/:id', function(req, res){
+        var request = req.body;
+        request.id = req.params.id;
+        network
+          .updateTripStatus(request)
+          .then(function(response){
+            res.json(response);
+          });
+      });
+      app.get(root + '/tripstatus/:id', function(req, res){
+        var request = {
+            id: req.params.id
+        };
+        network
+          .getTripStatus(request)
+          .then(function(response){
+            res.json(response);
+          });
+      });
+      app.post(root + '/payment/:id', function(req, res){
+        var request = req.body;
+        request.id = req.params.id;
+        network
+          .requestPayment(request)
+          .then(function(response){
+            res.json(response);
+          });
+      });
+      app.put(root + '/payment/:id', function(req, res){
+        var request = req.body;
+        request.id = req.params.id;
+        network
+          .acceptPayment(request)
           .then(function(response){
             res.json(response);
           });
       });
     })(id);
   }
-  
+
   app.listen(app.get('port'), function (){
     console.log("server listening on port " + app.get('port'));
   });

@@ -12,7 +12,7 @@ var simulationData = require('./models/simulation_data');
 var IProduct = new Interface('product', ['simulate','setNetwork']);
 
 function Product(config) {
-  
+
   if(!config.id) {
     throw new Error('Id is required');
   }
@@ -64,7 +64,7 @@ function Product(config) {
   if(config.acceptsCreditcardPayment === null) {
     throw new Error('Accepts creditcard payment is required');
   }
-  
+
   this.id = config.id.replace(/ /g, '');
   this.name = config.name;
   this.city = config.city;
@@ -94,11 +94,14 @@ function Product(config) {
   this.criticalPeriod = moment.duration(15, 'minutes');
   this.updateInterval = moment.duration(30, 'seconds');
   this.expectedDelayWhenNoDriversAvailable = moment.duration(3, 'hours');
+  this.passengerCancellationChance = 0.05;
+  this.passengerNoShowChance = 0.05;
+  this.driverCancellationChance = 0.05;
   this.nextId = 0;
   this.network = null;
   this.tripsId = this.id.toLowerCase() + '@tripthru.com';
   this.queue = [];
-  
+
   this.drivers = {};
   this.returningDrivers = [];
 }
@@ -150,8 +153,8 @@ Product.prototype.generateRandomTrips = function() {
   if(this.queue.length >= this.maxActiveTrips) {
     return;
   }
-  
-  var tripsToGenerate = 
+
+  var tripsToGenerate =
     Math.floor(this.simulationInterval.asHours() * this.tripsPerHour);
   //this handles fractional trips
   var d = (this.simulationInterval.asHours() * this.tripsPerHour) - tripsToGenerate;
@@ -161,7 +164,7 @@ Product.prototype.generateRandomTrips = function() {
   if(tripsToGenerate > this.maxActiveTrips) {
     tripsToGenerate = this.maxActiveTrips;
   }
-  if(tripsToGenerate < 1) { 
+  if(tripsToGenerate < 1) {
     return;
   }
   var now = moment();
@@ -291,18 +294,18 @@ Product.prototype.dispatch = function(trip) {
     return Promise.resolve();
   }
   logger.log(trip.id, 'Ready to dispatch');
-  
+
   return this
     .tryDispatchLocally(trip)
     .bind(this)
     .then(function(success){
       if(success) {
-        return trip.updateStatus(true, 'accepted', trip.driver.location, 
+        return trip.updateStatus(true, 'accepted', trip.driver.location,
             trip.pickupTime);
       } else if(trip.origination === 'local') {
         return this
           .network
-          .tryToDispatchToForeignProvider(trip)
+          .tryToDispatchToForeignProvider(trip, this.network.preferedNetworkId)
           .then(function(success){
             var status = success ? 'accepted' : 'rejected';
             return trip.updateStatus(false, status);
@@ -331,9 +334,9 @@ Product.prototype.isActiveStatus = function(status) {
 
 Product.prototype.tryDispatchLocally = function(trip) {
   logger.log(trip.id, 'Dispatch locally');
-  
+
   if(!this.servesLocation(trip.pickupLocation)) {
-    logger.log(trip.id, 'Pickup location ' + trip.pickupLocation.id + 
+    logger.log(trip.id, 'Pickup location ' + trip.pickupLocation.id +
         ' is outside of coverage area');
     return Promise.resolve(false);
   }
@@ -367,7 +370,7 @@ Product.prototype.dispatchToFirstAvailableDriver = function(trip) {
   trip.product = this;
   if(!trip.driver) {
     throw new Error('Invalid condition: driver is not defined');
-  } 
+  }
   logger.log(trip.id, 'Dispatched to: ' + trip.driver.name);
 };
 
@@ -414,7 +417,7 @@ Product.prototype.makeTripEnroute = function(trip) {
   return this
     .updateDriverRouteAndGetETA(trip, trip.pickupLocation)
     .then(function(eta){
-      return trip.updateStatus(true, 'en_route', trip.driver.location, eta, 
+      return trip.updateStatus(true, 'en_route', trip.driver.location, eta,
           trip.driver.route.distance, trip.driver.route.duration);
     });
 };
@@ -426,14 +429,14 @@ Product.prototype.updateDriverRouteAndGetETA = function(trip, destination) {
     .then(function(route){
       trip.driver.route = route;
       var eta = moment().add(route.duration);
-      logger.log(trip.id, trip.driver.name +  ' has a new route from ' + 
+      logger.log(trip.id, trip.driver.name +  ' has a new route from ' +
           trip.driver.location.id + ' to ' + destination.id + ': eta = ' + eta.format());
       return eta;
     });
 };
 
 Product.prototype.tripStatusUpdateIntervalReached = function(trip) {
-  return !trip.lastUpdate || 
+  return !trip.lastUpdate ||
     moment().isAfter(moment(trip.lastUpdate).add(this.updateInterval));
 };
 
@@ -463,7 +466,7 @@ Product.prototype.updateTripDriverLocation = function(trip) {
   if(!trip.driver.route) {
     throw new Error('Driver route is null');
   }
-  trip.driver.location = 
+  trip.driver.location =
     trip.driver.route.getCurrentWaypoint(trip.driver.routeStartTime, moment());
 };
 
@@ -476,7 +479,7 @@ Product.prototype.makeTripPickedUp = function(trip) {
   return this
     .updateDriverRouteAndGetETA(trip, trip.dropoffLocation)
     .then(function(eta){
-      return trip.updateStatus(true, 'picked_up', trip.driver.location, eta, 
+      return trip.updateStatus(true, 'picked_up', trip.driver.location, eta,
           trip.driver.route.distance, trip.driver.route.duration);
     });
 };
@@ -583,7 +586,7 @@ Product.prototype.driverHomeOfficeReached = function(driver) {
 };
 
 Product.prototype.driverUpdateIntervalReached = function(driver) {
-  return !driver.lastUpdate || 
+  return !driver.lastUpdate ||
     moment().isAfter(moment(driver.lastUpdate).add(this.updateInterval));
 };
 
@@ -593,7 +596,7 @@ Product.prototype.generateUniqueId = function() {
       .toString(16)
       .substring(1);
   }
-  return s4() + s4();
+  return s4() + s4() + s4();
 };
 
 Product.prototype.generateTripId = function() {
@@ -618,13 +621,13 @@ Product.prototype.getFareAndDistance = function(trip) {
         distance: route.distance,
         fare: this.baseCost + (route.distance * this.costPerMile)
       };
-      response.fare = response.fare.toFixed(2);
+      response.fare = parseFloat(response.fare.toFixed(2));
       return response;
     });
 };
 
 Product.prototype.getPickupEta = function(startLocation, pickupLocation, pickupTime, delayIfNoDrivers) {
-  var delay; 
+  var delay;
   if(delayIfNoDrivers && this.maxDriversReached()) {
     delay = this.expectedDelayWhenNoDriversAvailable;
   } else {
@@ -639,7 +642,7 @@ Product.prototype.getPickupEta = function(startLocation, pickupLocation, pickupT
 
 Product.prototype.healthCheck = function() {
   logger.log(this.id, 'Health check: ' +
-      'Queue: ' + this.queue.length + 
+      'Queue: ' + this.queue.length +
       ', Active trips: ' + Object.keys(this.network.activeTripsByPublicId).length +
       ', Drivers: ' + Object.keys(this.drivers).length +
       ', Returning drivers: ' + this.returningDrivers.length

@@ -7,7 +7,7 @@ module.exports = {
   simulationInterval: 10,
   tripsPerHour: 120,
   drivers: 2000,
-  currencyCode: 'USD',
+  currencyCode: 'EUR',
   capacity: 2000,
   imageUrl: 'http://www.tripthru.com/assets/networks/taxibeat@tripthru.com.png',
   acceptsPrescheduled: true,
@@ -15,6 +15,8 @@ module.exports = {
   acceptsCashPayment: true,
   acceptsAccountPayment: true,
   acceptsCreditcardPayment: true,
+  simulationType: 'tripthru',
+  endpointType: 'socket',
   coverage: [
        {city: 'Brasilia', businessPercentage: 20},
        {city: 'Paris', businessPercentage: 20},
@@ -22,5 +24,5 @@ module.exports = {
        {city: 'Mexico City', businessPercentage: 20},
        {city: 'Oslo', businessPercentage: 10},
        {city: 'Bucharest', businessPercentage: 10}
-   ] 
+   ]
 };

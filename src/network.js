@@ -45,6 +45,9 @@ function Network(config) {
   this.preferedNetworkId = config.preferedNetworkId;
   this.activeTripsByPublicId = {};
   this.tripRemovalDuration = moment.duration(3, 'minute');
+  if(config.callbackUrl) {
+    this.callbackUrl = config.callbackUrl;
+  }
 }
 
 Network.prototype.getNetworkInfo = function(request) {
@@ -182,6 +185,7 @@ Network.prototype.requestPayment = function(request) {
   
   setTimeout(function(){
     logger.log(request.id, this.id + ' accepting payment request');
+    trip = this.activeTripsByPublicId[trip.publicId];
     var acceptPaymentRequest = 
       TripThruApiFactory.createTripPaymentRequestFromTrip(trip, 'accept-payment');
     this.gatewayClient.acceptPayment(acceptPaymentRequest);
@@ -270,7 +274,7 @@ Network.prototype.updateForeignNetwork = function(trip) {
   return this.gatewayClient.updateTripStatus(request);
 };
 
-//This are helper functions used only by the bookings website
+//These are helper functions used only by the bookings website
 
 Network.prototype.bookingsQuoteTrip = function(request) {
   var quote = TripThruApiFactory.createResponseFromGetQuoteRequest(request, this.products);

@@ -1,3 +1,4 @@
+var Promise = require('bluebird');
 var logger = require('./logger');
 var maptools = require('./map_tools').MapTools;
 var moment = require('moment');

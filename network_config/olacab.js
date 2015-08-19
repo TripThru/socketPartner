@@ -7,7 +7,7 @@ module.exports = {
   simulationInterval: 10,
   tripsPerHour: 250,
   drivers: 900,
-  currencyCode: 'USD',
+  currencyCode: 'CAD',
   capacity: 2000,
   imageUrl: 'http://www.tripthru.com/assets/networks/olacab@tripthru.com.png',
   acceptsPrescheduled: true,
@@ -15,7 +15,9 @@ module.exports = {
   acceptsCashPayment: true,
   acceptsAccountPayment: true,
   acceptsCreditcardPayment: true,
+  simulationType: 'tripthru',
+  endpointType: 'socket',
   coverage: [
        {city: 'Bombay', businessPercentage: 100}
-   ] 
+   ]
 };

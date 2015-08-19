@@ -15,6 +15,8 @@ module.exports = {
   acceptsCashPayment: true,
   acceptsAccountPayment: true,
   acceptsCreditcardPayment: true,
+  simulationType: 'tripthru',
+  endpointType: 'socket',
   coverage: [
        {city: 'Atlanta', businessPercentage: 2},
        {city: 'Boston', businessPercentage: 2},
@@ -24,5 +26,5 @@ module.exports = {
        {city: 'San Francisco', businessPercentage: 12},
        {city: 'Washington', businessPercentage: 7},
        {city: 'Phoenix', businessPercentage: 12}
-   ] 
+   ]
 };

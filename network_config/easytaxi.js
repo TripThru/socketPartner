@@ -15,6 +15,8 @@ module.exports = {
   acceptsCashPayment: true,
   acceptsAccountPayment: true,
   acceptsCreditcardPayment: true,
+  simulationType: 'tripthru',
+  endpointType: 'socket',
   coverage: [
      { city: 'Buenos Aires', businessPercentage: 5 },
      { city: 'La Paz', businessPercentage: 1 },

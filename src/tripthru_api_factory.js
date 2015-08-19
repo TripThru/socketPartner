@@ -9,7 +9,7 @@ var MapToolsError = require('./map_tools').MapToolsError;
 // This module transforms incoming requests into inner structures known to the 
 // whole simulation, and transforms inner structures into outgoing requests.
 
-// To do: Create actual Trip and Quote objects instead of just same structure;
+// To do: Define actual Trip and Quote prototypes instead of just creating objects
 
 function successResponse() {
   return {
@@ -27,8 +27,12 @@ function failResponse(message, errorCode) {
 
 function idName(object) {
   var o = {};
-  if(object.id) o.id = object.id;
-  if(object.name) o.name = object.name;
+  if(object.id) {
+    o.id = object.id;
+  }
+  if(object.name) {
+    o.name = object.name;
+  }
   return o;
 }
 
@@ -37,7 +41,9 @@ function apiLocation(location) {
     lat: location.lat,
     lng: location.lng
   };
-  if(location.description) loc.description = location.description;
+  if(location.description) {
+    loc.description = location.description;
+  }
   return loc;
 }
 
@@ -71,7 +77,9 @@ function createDispatchRequest(trip, network) {
       luggage: 0,
       payment_method_code: 'cash'
   };
-  if(network) r.network_id = network.id;
+  if(network) {
+    r.network_id = network.id;
+  }
   return r;
 }
 
@@ -84,12 +92,20 @@ function createUpdateTripStatusRequest(trip) {
       id: trip.product.id,
       name: trip.product.name,
       image_url: trip.product.imageUrl
+    },
+    fare: {
+      amount: 5.00,
+      currency_code: trip.product.currencyCode
     }
   };
-  if(trip.eta) r.eta = getISOStringFromMoment(trip.eta);
+  if(trip.eta) {
+    r.eta = getISOStringFromMoment(trip.eta);
+  }
   if(trip.driver) {
     r.driver = idName(trip.driver);
-    if(trip.driver.location) r.driver.location = apiLocation(trip.driver.location);
+    if(trip.driver.location) {
+      r.driver.location = apiLocation(trip.driver.location);
+    }
   }
   return r;
 }
@@ -110,8 +126,12 @@ function createTripFromDispatchRequest(request) {
     pickupTime: getMomentFromISOString(request.pickup_time),
     dropoffLocation: request.dropoff_location,
   };
-  if(request.product_id) trip.product = idName({ id: request.product_id });
-  if(request.network_id) trip.network = idName({ id: request.network_id });
+  if(request.product_id) {
+    trip.product = idName({ id: request.product_id });
+  }
+  if(request.network_id) {
+    trip.network = idName({ id: request.network_id });
+  }
   return trip;
 }
 
@@ -126,7 +146,9 @@ function createTripFromUpdateTripStatusRequest(request) {
       trip.driver.location = request.driver.location;
     }
   }
-  if(request.eta) trip.eta = getMomentFromISOString(request.eta)
+  if(request.eta) {
+    trip.eta = getMomentFromISOString(request.eta);
+  }
   return trip;
 }
 
@@ -158,10 +180,18 @@ function createGetTripStatusResponse(trip, network) {
   r.product.image_url = trip.product.imageUrl;
   r.customer = idName(trip.customer);
   r.status = trip.status;
-  if(trip.eta) r.eta = getISOStringFromMoment(trip.eta);
+  r.fare = {
+    amount: trip.fare || 5.00,
+    currency_code: trip.product.currencyCode
+  };
+  if(trip.eta) {
+    r.eta = getISOStringFromMoment(trip.eta);
+  }
   if(trip.driver) {
     r.driver = idName(trip.driver);
-    if(trip.driver.location) r.driver.location = apiLocation(trip.driver.location);
+    if(trip.driver.location) {
+      r.driver.location = apiLocation(trip.driver.location);
+    }
   }
   return r;
 }
@@ -171,95 +201,6 @@ function createGetTripResponse(trip) {
   r.distance = trip.distance;
   r.fare = trip.fare;
   return r;
-}
-
-function createGetNetworkInfoResponse(products) {
-  var response = {
-    id: products[0].network.id,
-    name: products[0].network.name,
-    products: []
-  };
-  for(var i = 0; i < products.length; i++) {
-    var product = products[i];
-    var p = {
-      id: product.id,
-      name: product.name,
-      image_url: product.imageUrl,
-      capacity: product.capacity,
-      accepts_prescheduled: product.acceptsPrescheduled,
-      accepts_ondemand: product.acceptsOndemand,
-      accepts_cash_payment: product.acceptsCashPayment,
-      accepts_account_payment: product.acceptsAccountPayment,
-      accepts_creditcard_payment: product.acceptsCreditcardPayment
-    };
-    if(product.coverage) { 
-      p.coverage = product.coverage;
-    }
-    response.products.push(p);
-  }
-  return response;
-}
-
-function createRequestFromTrip(trip, type, args) {
-  switch(type) {
-    case 'dispatch':
-      var network;
-      if(args && args.network && args.network.id && args.network.name) {
-        network = args.network;
-      }
-      return createDispatchRequest(trip, network);
-    case 'update-trip-status':
-      return createUpdateTripStatusRequest(trip);
-    case 'get-trip-status':
-      return createGetTripStatusRequest(trip);
-    default:
-      throw new Error('Invalid request type ' + type);
-  }
-}
-
-function createResponseFromTrip(trip, type, message, errorCode, args) {
-  if(errorCode) {
-    return failResponse(message, errorCode);
-  }
-  switch(type) {
-    case 'dispatch':
-      return createDispatchResponse(trip);
-    case 'update-trip-status':
-      return createUpdateTripStatusResponse(trip);
-    case 'get-trip-status':
-      var network;
-      if(args && args.network && args.network.id && args.network.name) {
-        network = args.network;
-      } else {
-        throw new Error('Network arg is required');
-      }
-      return createGetTripStatusResponse(trip, network);
-    case 'get-trip':
-      return createGetTripResponse(trip);
-    default:
-      throw new Error('Invalid request type ' + type);
-  }
-}
-
-function createTripFromRequest(trip, type) {
-  switch(type) {
-    case 'dispatch':
-      return createTripFromDispatchRequest(trip);
-    case 'update-trip-status':
-      return createTripFromUpdateTripStatusRequest(trip);
-    case 'get-trip-status':
-      return createTripFromGetTripStatusRequest(trip);
-    case 'get-trip':
-      return createTripFromGetTripRequest(trip);
-    default:
-      throw new Error('Invalid request type ' + type);
-  }
-}
-
-function createResponseFromQuoteRequest(request, products) {
-  return {
-    result: resultCodes.ok
-  };
 }
 
 function createTripFromQuoteRequest(request, product) {
@@ -288,7 +229,10 @@ function createPaymentRequestFromTrip(trip) {
 function createAcceptPaymentRequestFromTrip(trip) {
   return {
     id: trip.publicId,
-    tip: 1,
+    tip: {
+      amount: 1.00,
+      currency_code: trip.product.currencyCode
+    },
     confirmation: true
   };
 }
@@ -314,39 +258,6 @@ function createTripFromAcceptPaymentRequest(request) {
   };
 }
 
-function createTripPaymentRequestFromTrip(trip, type) {
-  switch(type) {
-    case 'request-payment':
-      return createPaymentRequestFromTrip(trip);
-    case 'accept-payment':
-      return createAcceptPaymentRequestFromTrip(trip);
-    default:
-      throw new Error('Invalid request type ' + type);
-  }
-}
-
-function createResponseFromTripPaymentRequest(request, type) {
-  switch(type) {
-    case 'request-payment':
-      return createPaymentRequestResponseFromPaymentRequest(request);
-    case 'accept-payment':
-      return createAcceptPaymentResponseFromAcceptPaymentRequest(request);
-    default:
-      throw new Error('Invalid request type ' + type);
-  }
-}
-
-function createTripFromTripPaymentRequest(request, type) {
-  switch(type) {
-    case 'request-payment':
-      return createTripFromRequestPaymentRequest(request);
-    case 'accept-payment':
-      return createTripFromAcceptPaymentRequest(request);
-    default:
-      throw new Error('Invalid request type ' + type);
-  }
-}
-
 function createQuoteFromTrip(trip) {
   var quote = {
     id: guid()
@@ -370,8 +281,8 @@ function createQuoteFromTrip(trip) {
           .getFareAndDistance(trip)
           .then(function(fareAndDistance){
             quote.fare = {
-              low_estimate: 5,
-              high_estimate: 15,
+              low_estimate: 5.00,
+              high_estimate: 15.00,
               currency_code: trip.product.currencyCode
             };
             quote.distance = fareAndDistance.distance;
@@ -390,37 +301,6 @@ function createQuoteFromTrip(trip) {
     })
     .finally(function(){
       return null;
-    });
-}
-
-function createResponseFromGetQuoteRequest(request, products) {
-  var quotes = [];
-  var tasks = [];
-  for(var i = 0; i < products.length; i++) {
-    var product = products[i];
-    if(!product.servesLocation(request.pickup_location)) {
-      continue;
-    }
-    var trip = createTripFromQuoteRequest(request, product);
-    tasks.push(trip);
-  }
-  
-  // Run in sequence to avoid making too many google maps requests simultaneously
-  return PromiseHelper
-    .runInSequence(tasks, function(trip){
-      return createQuoteFromTrip(trip)
-        .then(function(quote){
-          if(quote) {
-            quote.eta = getISOStringFromMoment(quote.eta);
-            quotes.push(quote);
-          }
-        });
-    })
-    .then(function(){
-      var response = successResponse();
-      response.id = request.id;
-      response.quotes = quotes;
-      return response;
     });
 }
 
@@ -453,15 +333,118 @@ function createQuoteRequestFromQuote(quote) {
   throw new Error('Not implemented');
 }
 
-function createUpdateQuoteRequestFromQuote(quote) {
-  return createGetQuoteRequestFromQuote(quote);
-}
-
 function createGetQuoteRequestFromQuote(quote) {
   throw new Error('Not implemented');
 }
 
-function createRequestFromQuote(quote, type, args) {
+function createUpdateQuoteRequestFromQuote(quote) {
+  return createGetQuoteRequestFromQuote(quote);
+}
+
+
+
+function TripThruApiFactory() {
+  
+}
+
+TripThruApiFactory.prototype.createGetNetworkInfoResponse = function(products) {
+  var response = {
+      name: products[0].network.name,
+      products: []
+    };
+  if(products[0].network.callbackUrl) {
+    response.callback_url = products[0].network.callbackUrl;
+  }
+  for(var i = 0; i < products.length; i++) {
+    var product = products[i];
+    var p = {
+      id: product.id,
+      name: product.name,
+      image_url: product.imageUrl,
+      capacity: product.capacity,
+      accepts_prescheduled: product.acceptsPrescheduled,
+      accepts_ondemand: product.acceptsOndemand,
+      accepts_cash_payment: product.acceptsCashPayment,
+      accepts_account_payment: product.acceptsAccountPayment,
+      accepts_creditcard_payment: product.acceptsCreditcardPayment
+    };
+    if(product.coverage) { 
+      p.coverage = product.coverage;
+    }
+    response.products.push(p);
+  }
+  return response;
+};
+
+TripThruApiFactory.prototype.createSuccessResponse = function() {
+  return successResponse();
+};
+
+TripThruApiFactory.prototype.createFailResponse = function(message, errorCode) {
+  return failResponse(message, errorCode);
+};
+
+TripThruApiFactory.prototype.createRequestFromTrip = function(trip, type, args) {
+  switch(type) {
+    case 'dispatch':
+      var network;
+      if(args && args.network && args.network.id && args.network.name) {
+        network = args.network;
+      }
+      return createDispatchRequest(trip, network);
+    case 'update-trip-status':
+      return createUpdateTripStatusRequest(trip);
+    case 'get-trip-status':
+      return createGetTripStatusRequest(trip);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
+};
+
+TripThruApiFactory.prototype.createResponseFromTrip = function(trip, type, message, errorCode, args) {
+  if(errorCode) {
+    return failResponse(message, errorCode);
+  }
+  switch(type) {
+    case 'dispatch':
+      return createDispatchResponse(trip);
+    case 'update-trip-status':
+      return createUpdateTripStatusResponse(trip);
+    case 'get-trip-status':
+      var network;
+      if(args && args.network && args.network.id && args.network.name) {
+        network = args.network;
+      } else {
+        throw new Error('Network arg is required');
+      }
+      return createGetTripStatusResponse(trip, network);
+    case 'get-trip':
+      return createGetTripResponse(trip);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
+};
+
+TripThruApiFactory.prototype.createTripFromRequest = function(trip, type) {
+  switch(type) {
+    case 'dispatch':
+      return createTripFromDispatchRequest(trip);
+    case 'update-trip-status':
+      return createTripFromUpdateTripStatusRequest(trip);
+    case 'get-trip-status':
+      return createTripFromGetTripStatusRequest(trip);
+    case 'get-trip':
+      return createTripFromGetTripRequest(trip);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
+};
+
+TripThruApiFactory.prototype.createResponseFromQuoteRequest = function (request, products) {
+  return successResponse();
+};
+
+TripThruApiFactory.prototype.createRequestFromQuote = function (quote, type, args) {
   switch(type) {
     case 'quote':
       return createQuoteRequestFromQuote(quote);
@@ -472,9 +455,9 @@ function createRequestFromQuote(quote, type, args) {
     default:
       throw new Error('Invalid request type ' + type);
   }
-}
+};
 
-function createResponseFromQuote(quote, type, message, errorCode) {
+TripThruApiFactory.prototype.createResponseFromQuote = function(quote, type, message, errorCode) {
   if(errorCode) {
     return failResponse(message, errorCode);
   }
@@ -488,25 +471,82 @@ function createResponseFromQuote(quote, type, message, errorCode) {
     default:
       throw new Error('Invalid request type ' + type);
   }
-}
+};
 
-function createQuoteFromRequest(quote, type, args) {
+TripThruApiFactory.prototype.createQuoteFromRequest = function(quote, type, args) {
   switch(type) {
-    case 'quote':
-      return createQuoteFromQuoteRequest(quote);
-    case 'update':
-      if(!args || !args.quote) {
-        throw new Error('Need quote object to update');
-      }
-      return createQuoteFromUpdateQuoteRequest(quote, args.quote);
     case 'get':
       return createQuoteFromGetQuoteRequest(quote);
     default:
       throw new Error('Invalid request type ' + type);
   }
-}
+};
 
-function createDriversNearbyResponse(request, products) {
+TripThruApiFactory.prototype.createResponseFromGetQuoteRequest = function (request, products) {
+  var quotes = [];
+  var tasks = [];
+  for(var i = 0; i < products.length; i++) {
+    var product = products[i];
+    if(!product.servesLocation(request.pickup_location)) {
+      continue;
+    }
+    var trip = createTripFromQuoteRequest(request, product);
+    tasks.push(trip);
+  }
+  
+  // Run in sequence to avoid making too many google maps requests simultaneously
+  return PromiseHelper
+    .runInSequence(tasks, function(trip){
+      return createQuoteFromTrip(trip)
+        .then(function(quote){
+          if(quote) {
+            quote.eta = getISOStringFromMoment(quote.eta);
+            quotes.push(quote);
+          }
+        });
+    })
+    .then(function(){
+      var response = successResponse();
+      response.id = request.id;
+      response.quotes = quotes;
+      return response;
+    });
+};
+
+TripThruApiFactory.prototype.createTripPaymentRequestFromTrip = function (trip, type) {
+  switch(type) {
+    case 'request-payment':
+      return createPaymentRequestFromTrip(trip);
+    case 'accept-payment':
+      return createAcceptPaymentRequestFromTrip(trip);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
+};
+  
+TripThruApiFactory.prototype.createResponseFromTripPaymentRequest = function(request, type) {
+  switch(type) {
+    case 'request-payment':
+      return createPaymentRequestResponseFromPaymentRequest(request);
+    case 'accept-payment':
+      return createAcceptPaymentResponseFromAcceptPaymentRequest(request);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
+};
+
+TripThruApiFactory.prototype.createTripFromTripPaymentRequest = function(request, type) {
+  switch(type) {
+    case 'request-payment':
+      return createTripFromRequestPaymentRequest(request);
+    case 'accept-payment':
+      return createTripFromAcceptPaymentRequest(request);
+    default:
+      throw new Error('Invalid request type ' + type);
+  }
+};
+
+TripThruApiFactory.prototype.createDriversNearbyResponse = function(request, products) {
   return new Promise(function(resolve, reject){
     var coverage = {
       center: {
@@ -564,18 +604,6 @@ function createDriversNearbyResponse(request, products) {
         resolve(r);
       });
   });
-}
+};
 
-module.exports.createGetNetworkInfoResponse = createGetNetworkInfoResponse;
-module.exports.createRequestFromTrip = createRequestFromTrip;
-module.exports.createResponseFromTrip = createResponseFromTrip;
-module.exports.createTripFromRequest = createTripFromRequest;
-module.exports.createResponseFromQuoteRequest = createResponseFromQuoteRequest;
-module.exports.createRequestFromQuote = createRequestFromQuote;
-module.exports.createResponseFromQuote = createResponseFromQuote;
-module.exports.createQuoteFromRequest = createQuoteFromRequest;
-module.exports.createResponseFromGetQuoteRequest = createResponseFromGetQuoteRequest;
-module.exports.createTripPaymentRequestFromTrip = createTripPaymentRequestFromTrip;
-module.exports.createResponseFromTripPaymentRequest = createResponseFromTripPaymentRequest;
-module.exports.createTripFromTripPaymentRequest = createTripFromTripPaymentRequest;
-module.exports.createDriversNearbyResponse = createDriversNearbyResponse;
+module.exports = new TripThruApiFactory();

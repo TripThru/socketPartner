@@ -15,5 +15,7 @@ module.exports = {
   acceptsCashPayment: false,
   acceptsAccountPayment: false,
   acceptsCreditcardPayment: false,
+  simulationType: 'tripthru',
+  endpointType: 'socket',
   coverage: [] 
 };
